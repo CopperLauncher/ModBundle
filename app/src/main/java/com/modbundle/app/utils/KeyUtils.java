@@ -1,7 +1,7 @@
-package com.modvault.app.utils;
+package com.modbundle.app.utils;
 
 public class KeyUtils {
-    // XOR key - "ModVault" in bytes
+    // XOR key - "ModBundle" in bytes
     private static final byte[] XOR = {0x4D, 0x6F, 0x64, 0x56, 0x61, 0x75, 0x6C, 0x74};
 
     public static String decode(byte[] obfuscated) {

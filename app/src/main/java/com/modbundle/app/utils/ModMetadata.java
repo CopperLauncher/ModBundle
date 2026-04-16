@@ -1,4 +1,4 @@
-package com.modvault.app.utils;
+package com.modbundle.app.utils;
 
 public class ModMetadata {
     public String modId;

@@ -1,4 +1,4 @@
-package com.modvault.app.utils;
+package com.modbundle.app.utils;
 
 import android.content.Context;
 import android.graphics.Bitmap;
@@ -6,7 +6,7 @@ import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.widget.ImageView;
 import androidx.documentfile.provider.DocumentFile;
-import com.modvault.app.R;
+import com.modbundle.app.R;
 import java.io.InputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;

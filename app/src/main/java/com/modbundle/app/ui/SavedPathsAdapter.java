@@ -1,4 +1,4 @@
-package com.modvault.app.ui;
+package com.modbundle.app.ui;
 
 import android.content.Context;
 import android.net.Uri;
@@ -9,7 +9,7 @@ import android.widget.Button;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-import com.modvault.app.R;
+import com.modbundle.app.R;
 import java.util.List;
 
 public class SavedPathsAdapter extends RecyclerView.Adapter<SavedPathsAdapter.ViewHolder> {

@@ -1,4 +1,4 @@
-package com.modvault.app;
+package com.modbundle.app;
 
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
@@ -23,19 +23,19 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.modvault.app.api.ModrinthApi;
-import com.modvault.app.api.CurseForgeApi;
-import com.modvault.app.model.ModResult;
-import com.modvault.app.model.ModVersion;
-import com.modvault.app.model.SearchResponse;
-import com.modvault.app.ui.InstalledModsAdapter;
-import com.modvault.app.ui.ModAdapter;
-import com.modvault.app.ui.InstanceAdapter;
-import com.modvault.app.ui.SavedPathsAdapter;
+import com.modbundle.app.api.ModrinthApi;
+import com.modbundle.app.api.CurseForgeApi;
+import com.modbundle.app.model.ModResult;
+import com.modbundle.app.model.ModVersion;
+import com.modbundle.app.model.SearchResponse;
+import com.modbundle.app.ui.InstalledModsAdapter;
+import com.modbundle.app.ui.ModAdapter;
+import com.modbundle.app.ui.InstanceAdapter;
+import com.modbundle.app.ui.SavedPathsAdapter;
 import java.util.ArrayList;
-import com.modvault.app.utils.ModDownloader;
-import com.modvault.app.utils.PrefManager;
-import com.modvault.app.ModDetailActivity;
+import com.modbundle.app.utils.ModDownloader;
+import com.modbundle.app.utils.PrefManager;
+import com.modbundle.app.ModDetailActivity;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import java.util.Arrays;
 import java.util.List;
@@ -78,7 +78,7 @@ public class MainActivity extends AppCompatActivity {
     private final java.util.List<java.io.File> instanceList = new ArrayList<>();
     private RecyclerView savedPathsRecycler;
     private ModDownloader downloader;
-    private com.modvault.app.utils.InstanceNameStore instanceNameStore;
+    private com.modbundle.app.utils.InstanceNameStore instanceNameStore;
     private PrefManager prefs;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
@@ -97,7 +97,7 @@ public class MainActivity extends AppCompatActivity {
 
         prefs = new PrefManager(this);
         downloader = new ModDownloader(this);
-        instanceNameStore = new com.modvault.app.utils.InstanceNameStore(this);
+        instanceNameStore = new com.modbundle.app.utils.InstanceNameStore(this);
         requestStoragePermissionIfNeeded();
         initViews();
         setupBottomNav();
@@ -489,12 +489,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupBrowseRecycler() {
-        modAdapter = new ModAdapter(this, modResults, new com.modvault.app.ui.ModAdapter.OnInstallClickListener() {
-            public void onInstallClick(com.modvault.app.model.ModResult mod) {
+        modAdapter = new ModAdapter(this, modResults, new com.modbundle.app.ui.ModAdapter.OnInstallClickListener() {
+            public void onInstallClick(com.modbundle.app.model.ModResult mod) {
                 if (!prefs.hasInstanceFolder()) { showFolderPickerPrompt(); return; }
                 showInstallDialog(mod);
             }
-            public void onModClick(com.modvault.app.model.ModResult mod) {
+            public void onModClick(com.modbundle.app.model.ModResult mod) {
                 if (!prefs.hasInstanceFolder()) { showFolderPickerPrompt(); return; }
                 String modJson = new com.google.gson.Gson().toJson(mod);
                 Intent intent = new Intent(MainActivity.this, ModDetailActivity.class);
@@ -561,7 +561,7 @@ public class MainActivity extends AppCompatActivity {
                 String name = (mod instanceof androidx.documentfile.provider.DocumentFile)
                     ? ((androidx.documentfile.provider.DocumentFile) mod).getName()
                     : ((java.io.File) mod).getName();
-                com.modvault.app.utils.ModMetadata meta = installedAdapter.getMetaCache().get(name);
+                com.modbundle.app.utils.ModMetadata meta = installedAdapter.getMetaCache().get(name);
                 if (meta != null && meta.hasUpdate) performUpdate(mod, meta);
             }
         });
@@ -573,7 +573,7 @@ public class MainActivity extends AppCompatActivity {
                     String name = (mod instanceof androidx.documentfile.provider.DocumentFile)
                         ? ((androidx.documentfile.provider.DocumentFile) mod).getName()
                         : ((java.io.File) mod).getName();
-                    com.modvault.app.utils.ModMetadata meta = installedAdapter.getMetaCache().get(name);
+                    com.modbundle.app.utils.ModMetadata meta = installedAdapter.getMetaCache().get(name);
                     if (meta != null && meta.hasUpdate) performUpdate(mod, meta);
                 }
             } else {
@@ -581,7 +581,7 @@ public class MainActivity extends AppCompatActivity {
                     String name = (mod instanceof androidx.documentfile.provider.DocumentFile)
                         ? ((androidx.documentfile.provider.DocumentFile) mod).getName()
                         : ((java.io.File) mod).getName();
-                    com.modvault.app.utils.ModMetadata meta = installedAdapter.getMetaCache().get(name);
+                    com.modbundle.app.utils.ModMetadata meta = installedAdapter.getMetaCache().get(name);
                     if (meta != null && meta.hasUpdate) performUpdate(mod, meta);
                 }
             }
@@ -797,31 +797,31 @@ public class MainActivity extends AppCompatActivity {
         for (Object mod : modsCopy) {
             new Thread(() -> {
                 try {
-                    com.modvault.app.utils.ModMetadata meta = (mod instanceof androidx.documentfile.provider.DocumentFile)
-                        ? com.modvault.app.utils.ModMetadataParser.parse(this, (androidx.documentfile.provider.DocumentFile) mod)
-                        : com.modvault.app.utils.ModMetadataParser.parse((java.io.File) mod);
+                    com.modbundle.app.utils.ModMetadata meta = (mod instanceof androidx.documentfile.provider.DocumentFile)
+                        ? com.modbundle.app.utils.ModMetadataParser.parse(this, (androidx.documentfile.provider.DocumentFile) mod)
+                        : com.modbundle.app.utils.ModMetadataParser.parse((java.io.File) mod);
 
                     if (meta == null || meta.modId == null) {
                         if (pending.decrementAndGet() <= 0) finishCheckUpdates(updatesFound.get());
                         return;
                     }
-                    final com.modvault.app.utils.ModMetadata finalMeta = meta;
+                    final com.modbundle.app.utils.ModMetadata finalMeta = meta;
                     String fileName = (mod instanceof androidx.documentfile.provider.DocumentFile) ? ((androidx.documentfile.provider.DocumentFile) mod).getName() : ((java.io.File) mod).getName();
 
                     api.getVersions(finalMeta.modId, getSelectedVersion(), getSelectedLoader(),
                         versions -> {
                             if (versions != null && !versions.isEmpty()) {
-                                com.modvault.app.model.ModVersion latest = versions.get(0);
+                                com.modbundle.app.model.ModVersion latest = versions.get(0);
                                 boolean alreadyLatest = false;
                                 if (latest.files != null) {
-                                    for (com.modvault.app.model.ModVersion.VersionFile vf : latest.files) {
+                                    for (com.modbundle.app.model.ModVersion.VersionFile vf : latest.files) {
                                         if (vf.filename != null && vf.filename.equals(fileName)) { alreadyLatest = true; break; }
                                     }
                                 }
                                 if (!alreadyLatest) {
                                     finalMeta.hasUpdate = true;
                                     finalMeta.latestVersion = latest.versionNumber;
-                                    com.modvault.app.model.ModVersion.VersionFile f = com.modvault.app.utils.ModDownloader.getPrimaryFile(latest);
+                                    com.modbundle.app.model.ModVersion.VersionFile f = com.modbundle.app.utils.ModDownloader.getPrimaryFile(latest);
                                     if (f != null) { finalMeta.latestFileUrl = f.url; finalMeta.latestFileName = f.filename; }
                                     updatesFound.incrementAndGet();
                                 }
@@ -843,9 +843,9 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void performUpdate(Object mod, com.modvault.app.utils.ModMetadata meta) {
+    private void performUpdate(Object mod, com.modbundle.app.utils.ModMetadata meta) {
         if (meta.latestFileUrl == null) return;
-        com.modvault.app.model.ModVersion.VersionFile file = new com.modvault.app.model.ModVersion.VersionFile();
+        com.modbundle.app.model.ModVersion.VersionFile file = new com.modbundle.app.model.ModVersion.VersionFile();
         file.url = meta.latestFileUrl; file.filename = meta.latestFileName; file.primary = true;
         if (mod instanceof androidx.documentfile.provider.DocumentFile) ((androidx.documentfile.provider.DocumentFile) mod).delete();
         else if (mod instanceof java.io.File) ((java.io.File) mod).delete();
@@ -854,7 +854,7 @@ public class MainActivity extends AppCompatActivity {
         progress.setTitle("Updating...");
         progress.show();
 
-        com.modvault.app.utils.ModDownloader.DownloadCallback callback = new com.modvault.app.utils.ModDownloader.DownloadCallback() {
+        com.modbundle.app.utils.ModDownloader.DownloadCallback callback = new com.modbundle.app.utils.ModDownloader.DownloadCallback() {
             public void onProgress(String fileName, int percent) {}
             public void onSuccess(String fileName) {
                 handler.post(() -> { progress.dismiss(); refreshInstalled(); });

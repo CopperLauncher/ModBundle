@@ -1,4 +1,4 @@
-package com.modvault.app.ui;
+package com.modbundle.app.ui;
 
 import android.view.LayoutInflater;
 import android.view.View;
@@ -7,7 +7,7 @@ import android.widget.ImageButton;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-import com.modvault.app.R;
+import com.modbundle.app.R;
 import java.util.List;
 
 public class CustomScanPathsAdapter extends RecyclerView.Adapter<CustomScanPathsAdapter.ViewHolder> {

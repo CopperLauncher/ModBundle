@@ -1,4 +1,4 @@
-package com.modvault.app.ui;
+package com.modbundle.app.ui;
 
 import android.content.Context;
 import android.view.LayoutInflater;
@@ -12,8 +12,8 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
-import com.modvault.app.R;
-import com.modvault.app.model.ModResult;
+import com.modbundle.app.R;
+import com.modbundle.app.model.ModResult;
 
 import java.util.List;
 

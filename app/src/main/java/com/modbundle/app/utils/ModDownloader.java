@@ -1,10 +1,10 @@
-package com.modvault.app.utils;
+package com.modbundle.app.utils;
 
 import android.content.Context;
 import android.net.Uri;
 import androidx.documentfile.provider.DocumentFile;
-import com.modvault.app.api.ModrinthApi;
-import com.modvault.app.model.ModVersion;
+import com.modbundle.app.api.ModrinthApi;
+import com.modbundle.app.model.ModVersion;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;

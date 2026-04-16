@@ -25,7 +25,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="ModVault"
+            android:text="ModBundle"
             android:textColor="#FFFFFF"
             android:textSize="20sp"
             android:textStyle="bold"
@@ -441,7 +441,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="ModVault"
+                android:text="ModBundle"
                 android:textColor="#555"
                 android:textSize="11sp"
                 android:gravity="center"/>
@@ -457,14 +457,14 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="github.com/CopperLauncher/ModVault"
+                android:text="github.com/CopperLauncher/ModBundle"
                 android:textColor="#555"
                 android:textSize="10sp"
                 android:gravity="center"
                 android:layout_marginTop="2dp"
                 android:clickable="true"
                 android:focusable="true"
-                android:tag="https://github.com/CopperLauncher/ModVault"
+                android:tag="https://github.com/CopperLauncher/ModBundle"
                 android:id="@+id/tv_github_link"/>
             <TextView
                 android:layout_width="match_parent"

@@ -1,8 +1,8 @@
-package com.modvault.app.api;
+package com.modbundle.app.api;
 
-import com.modvault.app.model.ModResult;
-import com.modvault.app.model.ModVersion;
-import com.modvault.app.model.SearchResponse;
+import com.modbundle.app.model.ModResult;
+import com.modbundle.app.model.ModVersion;
+import com.modbundle.app.model.SearchResponse;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
@@ -16,7 +16,7 @@ import okhttp3.Response;
 public class ModrinthApi {
 
     private static final String BASE = "https://api.modrinth.com/v2";
-    private static final String USER_AGENT = "ModVault/1.0 (github.com/copperlauncher)";
+    private static final String USER_AGENT = "ModBundle/1.0 (github.com/copperlauncher)";
 
     private final OkHttpClient client = new OkHttpClient();
     private final Gson gson = new Gson();
@@ -121,7 +121,7 @@ public class ModrinthApi {
             try {
                 Request request = new Request.Builder()
                         .url("https://api.modrinth.com/v2/tag/game_version")
-                        .header("User-Agent", "ModVault/1.0")
+                        .header("User-Agent", "ModBundle/1.0")
                         .build();
                 try (Response response = client.newCall(request).execute()) {
                     if (!response.isSuccessful()) { onError.onError("HTTP " + response.code()); return; }

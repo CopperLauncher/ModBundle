@@ -1,4 +1,4 @@
-package com.modvault.app.ui;
+package com.modbundle.app.ui;
 
 import android.content.Context;
 import android.view.LayoutInflater;
@@ -10,8 +10,8 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-import com.modvault.app.R;
-import com.modvault.app.utils.InstanceNameStore;
+import com.modbundle.app.R;
+import com.modbundle.app.utils.InstanceNameStore;
 import java.io.File;
 import java.util.List;
 

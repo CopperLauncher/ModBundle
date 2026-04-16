@@ -1,4 +1,4 @@
-package com.modvault.app;
+package com.modbundle.app;
 
 import android.content.Intent;
 import android.net.Uri;
@@ -15,13 +15,13 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.bumptech.glide.Glide;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
-import com.modvault.app.api.CurseForgeApi;
-import com.modvault.app.api.ModrinthApi;
-import com.modvault.app.model.ModResult;
-import com.modvault.app.model.ModVersion;
-import com.modvault.app.ui.VersionAdapter;
-import com.modvault.app.utils.ModDownloader;
-import com.modvault.app.utils.PrefManager;
+import com.modbundle.app.api.CurseForgeApi;
+import com.modbundle.app.api.ModrinthApi;
+import com.modbundle.app.model.ModResult;
+import com.modbundle.app.model.ModVersion;
+import com.modbundle.app.ui.VersionAdapter;
+import com.modbundle.app.utils.ModDownloader;
+import com.modbundle.app.utils.PrefManager;
 import android.app.ProgressDialog;
 import android.os.Handler;
 import android.os.Looper;
@@ -110,8 +110,8 @@ public class ModDetailActivity extends AppCompatActivity {
             }
         }
 
-        api.getProject(mod.projectId, new com.modvault.app.api.ModrinthApi.Callback<com.modvault.app.model.ModResult>() {
-            public void onSuccess(com.modvault.app.model.ModResult fullMod) {
+        api.getProject(mod.projectId, new com.modbundle.app.api.ModrinthApi.Callback<com.modbundle.app.model.ModResult>() {
+            public void onSuccess(com.modbundle.app.model.ModResult fullMod) {
                 handler.post(() -> {
                     if (tvFollowers != null) tvFollowers.setText(formatNumber(fullMod.followers));
                     if (tvDownloads != null) tvDownloads.setText(formatNumber(fullMod.downloads));

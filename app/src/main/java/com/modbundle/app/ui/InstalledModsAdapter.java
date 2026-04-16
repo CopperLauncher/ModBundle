@@ -1,4 +1,4 @@
-package com.modvault.app.ui;
+package com.modbundle.app.ui;
 
 import android.view.LayoutInflater;
 import android.view.View;
@@ -9,9 +9,9 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.documentfile.provider.DocumentFile;
 import androidx.recyclerview.widget.RecyclerView;
-import com.modvault.app.R;
-import com.modvault.app.utils.ModIconLoader;
-import com.modvault.app.utils.ModMetadata;
+import com.modbundle.app.R;
+import com.modbundle.app.utils.ModIconLoader;
+import com.modbundle.app.utils.ModMetadata;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;

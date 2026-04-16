@@ -1,4 +1,4 @@
-package com.modvault.app.model;
+package com.modbundle.app.model;
 
 import com.google.gson.annotations.SerializedName;
 import java.util.List;

@@ -1,7 +1,7 @@
-package com.modvault.app.api;
+package com.modbundle.app.api;
 
-import com.modvault.app.utils.KeyUtils;
-import com.modvault.app.model.ModResult;
+import com.modbundle.app.utils.KeyUtils;
+import com.modbundle.app.model.ModResult;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;

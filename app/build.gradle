@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace 'com.modvault.app'
+    namespace 'com.modbundle.app'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.modvault.app"
+        applicationId "com.modbundle.app"
         minSdk 26
         targetSdk 34
         versionCode 1
@@ -45,4 +45,7 @@ dependencies {
 
     // JSON parsing
     implementation 'com.google.code.gson:gson:2.10.1'
+
+    // Image loading (Glide)
+    implementation 'com.github.bumptech.glide:glide:4.16.0'
 }

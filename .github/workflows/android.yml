@@ -39,19 +39,19 @@ jobs:
           xor_key = [0x4D, 0x6F, 0x64, 0x56, 0x61, 0x75, 0x6C, 0x74]
           obfuscated = [ord(c) ^ xor_key[i % len(xor_key)] for i, c in enumerate(api_key)]
           bytes_str = "{" + ", ".join(hex(b) for b in obfuscated) + "}"
-          with open('app/src/main/java/com/modvault/app/api/CurseForgeApi.java', 'r') as f:
+          with open('app/src/main/java/com/modbundle/app/api/CurseForgeApi.java', 'r') as f:
               content = f.read()
           content = content.replace(
               'KeyUtils.decode(new byte[]{0x50, 0x00, 0x00})',
               f'KeyUtils.decode(new byte[]{bytes_str})'
           )
-          with open('app/src/main/java/com/modvault/app/api/CurseForgeApi.java', 'w') as f:
+          with open('app/src/main/java/com/modbundle/app/api/CurseForgeApi.java', 'w') as f:
               f.write(content)
           print("Key injected!")
           PYEOF
       - name: Decode Keystore
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/modvault.jks
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/modbundle.jks
       - name: Build Debug APK
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -61,6 +61,6 @@ jobs:
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: ModVault-debug
+          name: ModBundle-debug
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 30

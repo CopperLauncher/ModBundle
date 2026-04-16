@@ -1,9 +1,9 @@
-package com.modvault.app;
+package com.modbundle.app;
 
 import android.app.Application;
 import androidx.appcompat.app.AppCompatDelegate;
 
-public class ModVaultApp extends Application {
+public class ModBundleApp extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
