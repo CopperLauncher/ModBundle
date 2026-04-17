@@ -295,6 +295,8 @@ public class MainActivity extends AppCompatActivity {
         }
         savedPathsRecycler.setVisibility(View.VISIBLE);
         savedPathsRecycler.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this));
+        savedPathsRecycler.setHasFixedSize(true);
+        savedPathsRecycler.setNestedScrollingEnabled(false);
         savedPathsRecycler.setAdapter(new SavedPathsAdapter(this, saved, active, new SavedPathsAdapter.Listener() {
             @Override public void onUse(android.net.Uri uri) {
                 prefs.saveModsUri(uri);
@@ -410,6 +412,8 @@ public class MainActivity extends AppCompatActivity {
 
             if (instancesRecycler != null) {
                 instancesRecycler.setLayoutManager(new LinearLayoutManager(this));
+                instancesRecycler.setHasFixedSize(true);
+                instancesRecycler.setNestedScrollingEnabled(false);
                 instancesRecycler.setAdapter(instanceAdapter);
             }
             if (btnScanInstances != null) btnScanInstances.setOnClickListener(v -> scanForInstances());
@@ -543,6 +547,8 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         browseRecycler.setLayoutManager(new LinearLayoutManager(this));
+        browseRecycler.setHasFixedSize(true);
+        browseRecycler.setNestedScrollingEnabled(false);
         browseRecycler.setAdapter(modAdapter);
     }
 
@@ -628,6 +634,8 @@ public class MainActivity extends AppCompatActivity {
             else installedAdapter.deselectAll();
         });
         installedRecycler.setLayoutManager(new LinearLayoutManager(this));
+        installedRecycler.setHasFixedSize(true);
+        installedRecycler.setNestedScrollingEnabled(false);
         installedRecycler.setAdapter(installedAdapter);
     }
 

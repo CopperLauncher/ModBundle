@@ -10,7 +10,9 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.modbundle.app.R;
 import java.util.List;
 
+@Deprecated
 public class CustomScanPathsAdapter extends RecyclerView.Adapter<CustomScanPathsAdapter.ViewHolder> {
+    // NOTE: this adapter is currently unused. It can be removed safely once cleanup is finalized.
     public interface OnRemoveListener { void onRemove(String path); }
     private final List<String> paths;
     private final OnRemoveListener listener;
