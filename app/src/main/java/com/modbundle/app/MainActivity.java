@@ -1071,6 +1071,18 @@ public class MainActivity extends AppCompatActivity {
             }
 
             // Fallback to SAF if file path cannot be resolved
+            String realPath = getRealPathFromUri(uri);
+            if (realPath != null) {
+                java.io.File instanceDir = new java.io.File(realPath);
+                if (instanceDir.exists() && instanceDir.isDirectory()) {
+                    prefs.saveInstanceUri(uri);
+                    addInstanceIfNotPresent(instanceDir);
+                    updateFolderLabel();
+                    updateActiveInstanceLabel();
+                    searchMods(true);
+                    return;
+                }
+            }
             prefs.saveInstanceUri(uri);
             updateFolderLabel();
             updateActiveInstanceLabel();

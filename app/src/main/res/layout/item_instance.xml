@@ -89,9 +89,9 @@
         android:id="@+id/btn_delete_instance"
         android:layout_width="36dp"
         android:layout_height="36dp"
-        android:src="@drawable/ic_menu_delete_forever"
+        android:src="@drawable/ic_delete"
         android:background="?attr/selectableItemBackgroundBorderless"
-        android:tint="#ff5555"
+        android:tint="#E53935"
         android:contentDescription="Remove"
         android:layout_marginEnd="2dp"/>
 
