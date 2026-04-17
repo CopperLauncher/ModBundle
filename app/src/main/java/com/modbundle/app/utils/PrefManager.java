@@ -31,7 +31,7 @@ public class PrefManager {
         return s != null ? Uri.parse(s) : null;
     }
 
-    /** @deprecated use getInstanceUri */
+    @Deprecated
     public void saveFilters(String gameVersion, String loader) {
         prefs.edit().putString(KEY_GAME_VER, gameVersion).putString(KEY_LOADER, loader).apply();
     }
@@ -39,6 +39,6 @@ public class PrefManager {
     public String getGameVersion() { return prefs.getString(KEY_GAME_VER, ""); }
     public String getLoader()      { return prefs.getString(KEY_LOADER, ""); }
     public boolean hasInstanceFolder() { return getInstanceUri() != null; }
-    /** @deprecated use hasInstanceFolder */
+    @Deprecated
     public boolean hasModsFolder() { return hasInstanceFolder(); }
 }
