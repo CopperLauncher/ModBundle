@@ -50,7 +50,7 @@ public class MainActivity extends AppCompatActivity {
     private RecyclerView browseRecycler, installedRecycler;
     private TextView emptyBrowse, emptyInstalled, tvFolderPath;
     private ProgressBar browseProgress;
-    private Button btnLoadMore, btnChooseFolder;
+    private Button btnChooseFolder;
 
     // State
     private final List<ModResult> modResults = new ArrayList<>();
@@ -60,6 +60,7 @@ public class MainActivity extends AppCompatActivity {
 
     private final ModrinthApi api = new ModrinthApi();
     private final CurseForgeApi curseForgeApi = new CurseForgeApi();
+    private boolean hasMoreResults = true;
     private boolean useCurseForge = false;
     private String currentProjectType = "mod";
     private Button btnModrinth, btnCurseForge;
@@ -152,7 +153,6 @@ public class MainActivity extends AppCompatActivity {
         btnTypeMods = findViewById(R.id.btn_type_mods);
         btnTypeResourcepack = findViewById(R.id.btn_type_resourcepack);
         btnTypeShader = findViewById(R.id.btn_type_shader);
-        btnLoadMore     = findViewById(R.id.btn_load_more);
         btnSnapshots    = findViewById(R.id.btn_snapshots);
         btnChooseFolder = findViewById(R.id.btn_choose_folder);
         installedTabMods = findViewById(R.id.installed_tab_mods);
@@ -234,7 +234,6 @@ public class MainActivity extends AppCompatActivity {
         spinnerVersion.setOnItemSelectedListener(filterListener);
         spinnerLoader.setOnItemSelectedListener(filterListener);
 
-        btnLoadMore.setOnClickListener(v -> searchMods(false));
         btnSnapshots.setOnCheckedChangeListener((b, checked) -> {
             includeSnapshots = checked;
             api.getGameVersions(includeSnapshots, versions -> {
@@ -387,8 +386,14 @@ public class MainActivity extends AppCompatActivity {
         android.net.Uri activeUri = prefs.getInstanceUri();
         if (activeUri != null) {
             addInstanceFromUri(activeUri);
+            String activePath = null;
             if ("file".equals(activeUri.getScheme())) {
-                instanceAdapter.setActiveInstancePath(activeUri.getPath());
+                activePath = activeUri.getPath();
+            } else if ("content".equals(activeUri.getScheme())) {
+                activePath = getRealPathFromUri(activeUri);
+            }
+            if (activePath != null) {
+                instanceAdapter.setActiveInstancePath(activePath);
             }
         }
         if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R) {
@@ -541,6 +546,20 @@ public class MainActivity extends AppCompatActivity {
         browseRecycler.setHasFixedSize(true);
         browseRecycler.setNestedScrollingEnabled(false);
         browseRecycler.setAdapter(modAdapter);
+        browseRecycler.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+                super.onScrolled(recyclerView, dx, dy);
+                if (dy <= 0 || isLoading || !hasMoreResults) return;
+                LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
+                if (layoutManager == null) return;
+                int totalItemCount = layoutManager.getItemCount();
+                int lastVisibleItem = layoutManager.findLastVisibleItemPosition();
+                if (lastVisibleItem >= totalItemCount - 2) {
+                    searchMods(false);
+                }
+            }
+        });
     }
 
     private void setupInstalledRecycler() {
@@ -649,15 +668,16 @@ public class MainActivity extends AppCompatActivity {
 
     private void searchMods(boolean reset) {
         if (isLoading) return;
+        if (!reset && !hasMoreResults) return;
         if (reset) {
             currentOffset = 0;
             modResults.clear();
             modAdapter.notifyDataSetChanged();
+            hasMoreResults = true;
         }
 
         isLoading = true;
         browseProgress.setVisibility(View.VISIBLE);
-        btnLoadMore.setVisibility(View.GONE);
         emptyBrowse.setVisibility(View.GONE);
 
         currentQuery = searchInput.getText().toString().trim();
@@ -671,13 +691,12 @@ public class MainActivity extends AppCompatActivity {
                     isLoading = false;
                     if (reset) { modAdapter.getMods().clear(); modAdapter.notifyDataSetChanged(); }
                     if (results.isEmpty()) {
+                        hasMoreResults = false;
                         if (modAdapter.getItemCount() == 0) emptyBrowse.setVisibility(android.view.View.VISIBLE);
-                        btnLoadMore.setVisibility(android.view.View.GONE);
                     } else {
                         emptyBrowse.setVisibility(android.view.View.GONE);
                         modAdapter.getMods().addAll(results); modAdapter.notifyDataSetChanged();
                         currentOffset += results.size();
-                        btnLoadMore.setVisibility(android.view.View.VISIBLE);
                     }
                 });
             }, error -> runOnUiThread(() -> {
@@ -699,8 +718,9 @@ public class MainActivity extends AppCompatActivity {
                         modResults.addAll(result.hits);
                         modAdapter.notifyDataSetChanged();
                         currentOffset += result.hits.size();
-                        btnLoadMore.setVisibility(
-                            currentOffset < result.totalHits ? View.VISIBLE : View.GONE);
+                        hasMoreResults = currentOffset < result.totalHits;
+                    } else {
+                        hasMoreResults = false;
                     }
                     emptyBrowse.setVisibility(modResults.isEmpty() ? View.VISIBLE : View.GONE);
                 });
@@ -1027,11 +1047,25 @@ public class MainActivity extends AppCompatActivity {
             Uri uri = data.getData();
             if (uri == null) return;
             getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-            prefs.saveInstanceUri(uri);
-            addInstanceFromUri(uri);
-            updateFolderLabel();
-            updateActiveInstanceLabel();
-            searchMods(true);
+
+            java.io.File instanceDir = null;
+            if ("file".equals(uri.getScheme())) {
+                instanceDir = new java.io.File(uri.getPath());
+            } else if ("content".equals(uri.getScheme())) {
+                String realPath = getRealPathFromUri(uri);
+                if (realPath != null) instanceDir = new java.io.File(realPath);
+            }
+
+            if (instanceDir != null && instanceDir.exists() && instanceDir.isDirectory()) {
+                Uri fileUri = Uri.fromFile(instanceDir);
+                prefs.saveInstanceUri(fileUri);
+                addInstanceIfNotPresent(instanceDir);
+                updateFolderLabel();
+                updateActiveInstanceLabel();
+                searchMods(true);
+            } else {
+                Toast.makeText(this, "Unable to convert selected folder to a file path.", Toast.LENGTH_LONG).show();
+            }
         }
     }
 

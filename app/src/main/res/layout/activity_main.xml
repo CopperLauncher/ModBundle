@@ -216,18 +216,6 @@
                 android:padding="32dp"
                 android:visibility="gone"/>
 
-            <!-- Load More -->
-            <Button
-                android:id="@+id/btn_load_more"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center_horizontal"
-                android:text="Load More"
-                android:textColor="#FFFFFF"
-                android:backgroundTint="#9649b8"
-                android:layout_margin="10dp"
-                android:visibility="gone"/>
-
         </LinearLayout>
 
         <!-- INSTALLED TAB -->
