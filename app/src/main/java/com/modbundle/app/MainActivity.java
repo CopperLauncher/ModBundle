@@ -387,14 +387,9 @@ public class MainActivity extends AppCompatActivity {
         android.net.Uri activeUri = prefs.getInstanceUri();
         if (activeUri != null) {
             addInstanceFromUri(activeUri);
-            String activePath = null;
-            if ("file".equals(activeUri.getScheme())) {
-                activePath = activeUri.getPath();
-            } else if ("content".equals(activeUri.getScheme())) {
-                activePath = getRealPathFromUri(activeUri);
-            }
-            if (activePath != null) {
-                instanceAdapter.setActiveInstancePath(activePath);
+            Uri preferred = resolvePreferredInstanceUri(activeUri);
+            if (preferred != null && "file".equals(preferred.getScheme())) {
+                instanceAdapter.setActiveInstancePath(preferred.getPath());
             }
         }
         if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R) {
@@ -413,16 +408,27 @@ public class MainActivity extends AppCompatActivity {
         instanceAdapter.notifyDataSetChanged();
     }
 
+    private Uri resolvePreferredInstanceUri(Uri uri) {
+        if (uri == null) return null;
+        if ("file".equals(uri.getScheme())) return uri;
+        if ("content".equals(uri.getScheme())) {
+            String realPath = getRealPathFromUri(uri);
+            if (realPath != null) {
+                java.io.File instanceDir = new java.io.File(realPath);
+                if (instanceDir.exists() && instanceDir.isDirectory()) {
+                    return Uri.fromFile(instanceDir);
+                }
+            }
+        }
+        return uri;
+    }
+
     private void addInstanceFromUri(Uri uri) {
         if (uri == null) return;
-        java.io.File instanceDir = null;
-        if ("file".equals(uri.getScheme())) {
-            instanceDir = new java.io.File(uri.getPath());
-        } else if ("content".equals(uri.getScheme())) {
-            String realPath = getRealPathFromUri(uri);
-            if (realPath != null) instanceDir = new java.io.File(realPath);
+        Uri preferred = resolvePreferredInstanceUri(uri);
+        if (preferred != null && "file".equals(preferred.getScheme())) {
+            addInstanceIfNotPresent(new java.io.File(preferred.getPath()));
         }
-        addInstanceIfNotPresent(instanceDir);
     }
 
     private void updateActiveInstanceLabel() {
@@ -435,7 +441,7 @@ public class MainActivity extends AppCompatActivity {
         } else {
             String path = "file".equals(uri.getScheme()) ? uri.getPath() : uri.toString();
             String customName = instanceNameStore.getName(path);
-            String display = (customName != null && !customName.isEmpty()) ? customName : uri.getLastPathSegment();
+            String display = (customName != null && !customName.isEmpty()) ? customName : getUriDisplayName(uri);
             if (display == null) display = uri.toString();
             tvActive.setText("Active: " + display);
         }
@@ -1062,30 +1068,48 @@ public class MainActivity extends AppCompatActivity {
             if (uri == null) return;
             getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
 
-            java.io.File instanceDir = null;
-            if ("file".equals(uri.getScheme())) {
-                instanceDir = new java.io.File(uri.getPath());
-            } else if ("content".equals(uri.getScheme())) {
-                String realPath = getRealPathFromUri(uri);
-                if (realPath != null) instanceDir = new java.io.File(realPath);
+            Uri preferred = resolvePreferredInstanceUri(uri);
+            if (preferred != null && "file".equals(preferred.getScheme())) {
+                java.io.File instanceDir = new java.io.File(preferred.getPath());
+                if (instanceDir.exists() && instanceDir.isDirectory()) {
+                    prefs.saveInstanceUri(preferred);
+                    addInstanceIfNotPresent(instanceDir);
+                    updateFolderLabel();
+                    updateActiveInstanceLabel();
+                    searchMods(true);
+                    return;
+                }
             }
 
-            if (instanceDir != null && instanceDir.exists() && instanceDir.isDirectory()) {
-                Uri fileUri = Uri.fromFile(instanceDir);
-                prefs.saveInstanceUri(fileUri);
-                addInstanceIfNotPresent(instanceDir);
-                updateFolderLabel();
-                updateActiveInstanceLabel();
-                searchMods(true);
-            } else {
-                Toast.makeText(this, "Unable to convert selected folder to a file path.", Toast.LENGTH_LONG).show();
-            }
+            // Fallback to SAF if file path cannot be resolved
+            prefs.saveInstanceUri(uri);
+            updateFolderLabel();
+            updateActiveInstanceLabel();
+            searchMods(true);
         }
     }
 
     private void updateFolderLabel() {
         Uri uri = prefs.getInstanceUri();
-        if (tvFolderPath != null) tvFolderPath.setText(uri != null ? uri.getLastPathSegment() : "No folder selected");
+        if (tvFolderPath == null) return;
+        if (uri == null) {
+            tvFolderPath.setText("No folder selected");
+            return;
+        }
+        String label = uri.getLastPathSegment();
+        if (label == null || label.isEmpty()) {
+            label = getUriDisplayName(uri);
+        }
+        tvFolderPath.setText(label != null ? label : uri.toString());
+    }
+
+    private String getUriDisplayName(Uri uri) {
+        if (uri == null) return null;
+        try {
+            androidx.documentfile.provider.DocumentFile file = androidx.documentfile.provider.DocumentFile.fromTreeUri(this, uri);
+            if (file != null && file.getName() != null) return file.getName();
+        } catch (Exception ignored) {}
+        return uri.getLastPathSegment();
     }
 
     private void showFolderPickerPrompt() {
