@@ -84,6 +84,17 @@
         android:contentDescription="Edit"
         android:layout_marginEnd="2dp"/>
 
+    <!-- Delete instance button -->
+    <ImageButton
+        android:id="@+id/btn_delete_instance"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:src="@drawable/ic_menu_delete_forever"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:tint="#ff5555"
+        android:contentDescription="Remove"
+        android:layout_marginEnd="2dp"/>
+
     <!-- Select button -->
     <Button
         android:id="@+id/btn_select_instance"

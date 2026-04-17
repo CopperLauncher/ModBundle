@@ -20,7 +20,10 @@ public class PrefManager {
 
     /** Save the instance root folder URI (e.g. .minecraft or instance root) */
     public void saveInstanceUri(Uri uri) {
-        if (uri == null) return;
+        if (uri == null) {
+            prefs.edit().remove(KEY_INSTANCE_URI).apply();
+            return;
+        }
         prefs.edit().putString(KEY_INSTANCE_URI, uri.toString()).apply();
     }
 

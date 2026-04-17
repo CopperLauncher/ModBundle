@@ -20,11 +20,13 @@ public class InstanceAdapter extends RecyclerView.Adapter<InstanceAdapter.ViewHo
     public interface OnSelectListener { void onSelect(File instance, String instanceName); }
     public interface OnRenameListener { void onRename(File instance, String currentName); }
     public interface OnLogoListener { void onChangeLogo(File instance, String currentPath); }
+    public interface OnDeleteListener { void onDelete(File instance, String currentPath); }
 
     private final List<File> instances;
     private final OnSelectListener selectListener;
     private OnRenameListener renameListener;
     private OnLogoListener logoListener;
+    private OnDeleteListener deleteListener;
     private final Context ctx;
     private final InstanceNameStore nameStore;
     private String activeInstancePath = null;
@@ -38,6 +40,7 @@ public class InstanceAdapter extends RecyclerView.Adapter<InstanceAdapter.ViewHo
 
     public void setRenameListener(OnRenameListener l) { this.renameListener = l; }
     public void setLogoListener(OnLogoListener l) { this.logoListener = l; }
+    public void setDeleteListener(OnDeleteListener l) { this.deleteListener = l; }
     public void setActiveInstancePath(String path) { this.activeInstancePath = path; notifyDataSetChanged(); }
 
     @NonNull @Override
@@ -77,8 +80,16 @@ public class InstanceAdapter extends RecyclerView.Adapter<InstanceAdapter.ViewHo
         // Logo
         String logoName = nameStore.getLogo(path);
         if (logoName != null) {
-            int resId = ctx.getResources().getIdentifier(logoName, "drawable", ctx.getPackageName());
-            holder.logo.setImageResource(resId != 0 ? resId : R.drawable.ic_launcher_monochrome);
+            if (logoName.startsWith("content://") || logoName.startsWith("file://")) {
+                try {
+                    holder.logo.setImageURI(Uri.parse(logoName));
+                } catch (Exception e) {
+                    holder.logo.setImageResource(R.drawable.ic_launcher_monochrome);
+                }
+            } else {
+                int resId = ctx.getResources().getIdentifier(logoName, "drawable", ctx.getPackageName());
+                holder.logo.setImageResource(resId != 0 ? resId : R.drawable.ic_launcher_monochrome);
+            }
         } else {
             holder.logo.setImageResource(R.drawable.ic_launcher_monochrome);
         }
@@ -91,6 +102,7 @@ public class InstanceAdapter extends RecyclerView.Adapter<InstanceAdapter.ViewHo
 
         holder.logo.setOnClickListener(v -> { if (logoListener != null) logoListener.onChangeLogo(instance, path); });
         holder.btnRename.setOnClickListener(v -> { if (renameListener != null) renameListener.onRename(instance, displayName); });
+        holder.btnDelete.setOnClickListener(v -> { if (deleteListener != null) deleteListener.onDelete(instance, path); });
         holder.select.setOnClickListener(v -> selectListener.onSelect(instance, displayName));
     }
 
@@ -99,7 +111,7 @@ public class InstanceAdapter extends RecyclerView.Adapter<InstanceAdapter.ViewHo
     static class ViewHolder extends RecyclerView.ViewHolder {
         ImageView logo;
         TextView name, path, loaderBadge, versionBadge;
-        ImageButton btnRename;
+        ImageButton btnRename, btnDelete;
         Button select;
         ViewHolder(View v) {
             super(v);
@@ -109,6 +121,7 @@ public class InstanceAdapter extends RecyclerView.Adapter<InstanceAdapter.ViewHo
             loaderBadge = v.findViewById(R.id.instance_loader_badge);
             versionBadge = v.findViewById(R.id.instance_version_badge);
             btnRename = v.findViewById(R.id.btn_rename_instance);
+            btnDelete = v.findViewById(R.id.btn_delete_instance);
             select = v.findViewById(R.id.btn_select_instance);
         }
     }

@@ -43,6 +43,7 @@ import java.util.List;
 public class MainActivity extends AppCompatActivity {
 
     private static final int REQUEST_FOLDER = 3001;
+    private static final int REQUEST_LOGO = 3002;
 
     // Views
     private View layoutBrowse, layoutInstalled, layoutSettings, layoutInstances;
@@ -74,7 +75,8 @@ public class MainActivity extends AppCompatActivity {
     private android.widget.CheckBox btnSnapshots;
     private boolean includeSnapshots = false;
     private RecyclerView instancesRecycler;
-    private ImageButton btnScanInstances;
+    private String pendingLogoInstancePath;
+    
     private InstanceAdapter instanceAdapter;
     private final java.util.List<java.io.File> instanceList = new ArrayList<>();
     private ModDownloader downloader;
@@ -344,23 +346,40 @@ public class MainActivity extends AppCompatActivity {
 
         // Wire logo picker listener
         instanceAdapter.setLogoListener((instance, path) -> {
-            String[] logoNames = {
-                "ic_launcher_monochrome", "ic_fabric", "ic_quilt",
-                "ic_pojav_full", "ic_curseforge", "ic_modrinth",
-                "ic_mg_renderer", "ic_menu_home", "ic_folder",
-                "ic_add_modded", "ic_menu_settings", "ic_file"
-            };
-            String[] labels = {
-                "Default", "Fabric", "Quilt",
-                "PojavLauncher", "CurseForge", "Modrinth",
-                "MG Renderer", "Home", "Folder",
-                "Modded", "Settings", "File"
-            };
+            String[] logoNames = {"ic_fabric", "ic_quilt", "ic_forge", "ic_neoforge", "gallery"};
+            String[] labels = {"Fabric", "Quilt", "Forge", "NeoForge", "Gallery"};
             new AlertDialog.Builder(this)
                 .setTitle("Choose Logo")
                 .setItems(labels, (d, which) -> {
-                    instanceNameStore.setLogo(instance.getAbsolutePath(), logoNames[which]);
-                    instanceAdapter.notifyDataSetChanged();
+                    if (logoNames[which].equals("gallery")) {
+                        pendingLogoInstancePath = instance.getAbsolutePath();
+                        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                        intent.addCategory(Intent.CATEGORY_OPENABLE);
+                        intent.setType("image/*");
+                        startActivityForResult(intent, REQUEST_LOGO);
+                    } else {
+                        instanceNameStore.setLogo(path, logoNames[which]);
+                        instanceAdapter.notifyDataSetChanged();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+        });
+
+        instanceAdapter.setDeleteListener((instance, path) -> {
+            new AlertDialog.Builder(this)
+                .setTitle("Remove instance")
+                .setMessage("Remove this instance from the app? This will not delete the actual folder.")
+                .setPositiveButton("Remove", (d, w) -> {
+                    if (instance != null) {
+                        instanceList.remove(instance);
+                        if (path.equals(prefs.getInstanceUri() != null ? ("file".equals(prefs.getInstanceUri().getScheme()) ? prefs.getInstanceUri().getPath() : prefs.getInstanceUri().toString()) : "")) {
+                            prefs.saveInstanceUri(null);
+                            updateFolderLabel();
+                            updateActiveInstanceLabel();
+                        }
+                        instanceAdapter.notifyDataSetChanged();
+                    }
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
@@ -369,8 +388,6 @@ public class MainActivity extends AppCompatActivity {
         android.view.View instLayout = layoutInstances;
         if (instLayout != null) {
             instancesRecycler = instLayout.findViewById(R.id.instances_recycler);
-            btnScanInstances = instLayout.findViewById(R.id.btn_scan_instances);
-            ImageButton btnChooseFromInst = instLayout.findViewById(R.id.btn_choose_folder);
             ImageButton btnAddInstance = instLayout.findViewById(R.id.btn_add_instance);
 
             if (instancesRecycler != null) {
@@ -379,7 +396,6 @@ public class MainActivity extends AppCompatActivity {
                 instancesRecycler.setNestedScrollingEnabled(false);
                 instancesRecycler.setAdapter(instanceAdapter);
             }
-            if (btnScanInstances != null) btnScanInstances.setOnClickListener(v -> scanForInstances());
             if (btnAddInstance != null) btnAddInstance.setOnClickListener(v -> openFolderPicker());
         }
 
@@ -391,9 +407,6 @@ public class MainActivity extends AppCompatActivity {
             if (preferred != null && "file".equals(preferred.getScheme())) {
                 instanceAdapter.setActiveInstancePath(preferred.getPath());
             }
-        }
-        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R) {
-            scanForInstances();
         }
         updateActiveInstanceLabel();
     }
@@ -447,46 +460,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void scanForInstances() {
-        instanceList.clear();
-        String ext = android.os.Environment.getExternalStorageDirectory().getAbsolutePath();
-        String[] basePaths = {
-            ext + "/games/PojavLauncher/custom_instances",
-            ext + "/games/CopperLauncher/custom_instances",
-            ext + "/games/Amethyst/custom_instances",
-            ext + "/games/PojavLauncher/instances",
-        };
-        for (String path : basePaths) {
-            java.io.File dir = new java.io.File(path);
-            if (dir.exists() && dir.isDirectory()) {
-                java.io.File[] instances = dir.listFiles();
-                if (instances != null) {
-                    for (java.io.File f : instances) {
-                        if (f.isDirectory()) instanceList.add(f);
-                    }
-                }
-            }
-        }
-        instanceAdapter.notifyDataSetChanged();
-        if (instanceList.isEmpty()) {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                new androidx.appcompat.app.AlertDialog.Builder(this)
-                    .setTitle("No instances found")
-                    .setMessage("On Android 11+, launcher files in Android/data/ can't be accessed automatically.\n\nTap 'Browse' to manually navigate to your launcher's custom_instances folder.")
-                    .setPositiveButton("Browse Android/data", (d, w) -> {
-                        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-                        intent.putExtra("android.provider.extra.INITIAL_URI",
-                            android.provider.DocumentsContract.buildDocumentUri(
-                                "com.android.externalstorage.documents", "primary:Android/data"));
-                        startActivityForResult(intent, REQUEST_FOLDER);
-                    })
-                    .setNegativeButton("Use Manual Picker", (d, w) -> btnChooseFolder.performClick())
-                    .show();
-            } else {
-                Toast.makeText(this, "No instances found. Choose folder manually.", Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
 
     private void setupSourceToggle() {
         boolean curseForgeAvailable = com.modbundle.app.api.CurseForgeApi.isEnabled();
@@ -1086,6 +1059,16 @@ public class MainActivity extends AppCompatActivity {
             updateFolderLabel();
             updateActiveInstanceLabel();
             searchMods(true);
+            return;
+        }
+
+        if (requestCode == REQUEST_LOGO && resultCode == RESULT_OK && data != null) {
+            Uri uri = data.getData();
+            if (uri == null || pendingLogoInstancePath == null) return;
+            getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            instanceNameStore.setLogo(pendingLogoInstancePath, uri.toString());
+            instanceAdapter.notifyDataSetChanged();
+            pendingLogoInstancePath = null;
         }
     }
 
