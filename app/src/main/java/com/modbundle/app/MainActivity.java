@@ -308,7 +308,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Wire rename/edit listener - name + loader + version
         instanceAdapter.setRenameListener((instance, currentName) -> {
-            String path = instance.getAbsolutePath();
+            String path = instance.path;
             android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
             layout.setOrientation(android.widget.LinearLayout.VERTICAL);
             layout.setPadding(48, 16, 48, 0);
@@ -362,7 +362,7 @@ public class MainActivity extends AppCompatActivity {
                 .setTitle("Choose Logo")
                 .setAdapter(logoAdapter, (d, which) -> {
                     if (logoNames[which].equals("gallery")) {
-                        pendingLogoInstancePath = instance.getAbsolutePath();
+                        pendingLogoInstancePath = instance.path;
                         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                         intent.addCategory(Intent.CATEGORY_OPENABLE);
                         intent.setType("image/*");
@@ -1122,7 +1122,7 @@ public class MainActivity extends AppCompatActivity {
                 java.io.File instanceDir = new java.io.File(preferred.getPath());
                 if (instanceDir.exists() && instanceDir.isDirectory()) {
                     prefs.saveInstanceUri(preferred);
-                    addInstanceIfNotPresent(instanceDir);
+                    addInstanceIfNotPresent(new InstanceAdapter.InstanceEntry(instanceDir.getAbsolutePath(), false));
                     instanceAdapter.setActiveInstancePath(instanceDir.getAbsolutePath());
                     updateFolderLabel();
                     updateActiveInstanceLabel();
@@ -1137,7 +1137,7 @@ public class MainActivity extends AppCompatActivity {
                 java.io.File instanceDir = new java.io.File(realPath);
                 if (instanceDir.exists() && instanceDir.isDirectory()) {
                     prefs.saveInstanceUri(uri);
-                    addInstanceIfNotPresent(instanceDir);
+                    addInstanceIfNotPresent(new InstanceAdapter.InstanceEntry(instanceDir.getAbsolutePath(), false));
                     instanceAdapter.setActiveInstancePath(instanceDir.getAbsolutePath());
                     updateFolderLabel();
                     updateActiveInstanceLabel();
