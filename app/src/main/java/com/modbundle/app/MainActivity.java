@@ -348,9 +348,24 @@ public class MainActivity extends AppCompatActivity {
         instanceAdapter.setLogoListener((instance, path) -> {
             String[] logoNames = {"ic_fabric", "ic_quilt", "ic_forge", "ic_neoforge", "gallery"};
             String[] labels = {"Fabric", "Quilt", "Forge", "NeoForge", "Gallery"};
+            int[] iconResIds = {R.drawable.ic_fabric, R.drawable.ic_quilt, R.drawable.ic_forge, R.drawable.ic_neoforge, 0};
+
+            ArrayAdapter<String> logoAdapter = new ArrayAdapter<String>(this, android.R.layout.select_dialog_item, labels) {
+                @NonNull
+                @Override
+                public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                    TextView item = (TextView) super.getView(position, convertView, parent);
+                    if (iconResIds[position] != 0) {
+                        item.setCompoundDrawablesWithIntrinsicBounds(iconResIds[position], 0, 0, 0);
+                        item.setCompoundDrawablePadding((int) (12 * getResources().getDisplayMetrics().density));
+                    }
+                    return item;
+                }
+            };
+
             new AlertDialog.Builder(this)
                 .setTitle("Choose Logo")
-                .setItems(labels, (d, which) -> {
+                .setAdapter(logoAdapter, (d, which) -> {
                     if (logoNames[which].equals("gallery")) {
                         pendingLogoInstancePath = instance.getAbsolutePath();
                         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);

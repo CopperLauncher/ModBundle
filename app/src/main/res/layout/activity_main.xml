@@ -19,8 +19,8 @@
         <ImageView
             android:layout_width="28dp"
             android:layout_height="28dp"
-            android:src="@drawable/ic_cu_logo"
-            android:background="@android:color/transparent"
+            android:src="@drawable/ic_modbundle_logo"
+            android:background="@null"
             android:adjustViewBounds="true"
             android:scaleType="centerInside"
             android:contentDescription="ModBundle logo"
