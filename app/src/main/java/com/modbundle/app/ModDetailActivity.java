@@ -314,14 +314,14 @@ public class ModDetailActivity extends AppCompatActivity {
         Uri instanceUri = prefs.getInstanceUri();
         if (instanceUri != null && "content".equals(instanceUri.getScheme())) {
             downloader.downloadMod(file, instanceUri, subFolder,
-                dependencies, "", "", callback);
+                dependencies, gameVersion, loader, callback);
         } else {
             java.io.File instanceDir = prefs.getInstanceUri() != null
                 ? new java.io.File(prefs.getInstanceUri().getPath()) : null;
             if (instanceDir == null) { pDialog.dismiss(); return; }
             java.io.File targetDir = new java.io.File(instanceDir, subFolder);
             if (!targetDir.exists()) targetDir.mkdirs();
-            downloader.downloadMod(file, targetDir, dependencies, "", "", callback);
+            downloader.downloadMod(file, targetDir, dependencies, gameVersion, loader, callback);
         }
     }
 

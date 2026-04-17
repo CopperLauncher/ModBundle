@@ -35,8 +35,12 @@ public class CurseForgeApi {
                 if (query != null && !query.isEmpty()) url.append("&searchFilter=").append(encode(query));
                 if (gameVersion != null && !gameVersion.isEmpty() && !gameVersion.equals("Any"))
                     url.append("&gameVersion=").append(encode(gameVersion));
-                if (loader != null && !loader.isEmpty() && !loader.equals("Any"))
-                    url.append("&modLoaderType=").append(loaderType(loader));
+                if (loader != null && !loader.isEmpty() && !loader.equals("Any")) {
+                    int loaderCode = loaderType(loader);
+                    if (loaderCode != 0) {
+                        url.append("&modLoaderType=").append(loaderCode);
+                    }
+                }
                 url.append("&sortField=2&sortOrder=desc");
 
                 Request request = new Request.Builder()
@@ -98,8 +102,12 @@ public class CurseForgeApi {
                 StringBuilder url = new StringBuilder(BASE + "/mods/" + modId + "/files?pageSize=10");
                 if (gameVersion != null && !gameVersion.isEmpty() && !gameVersion.equals("Any"))
                     url.append("&gameVersion=").append(encode(gameVersion));
-                if (loader != null && !loader.isEmpty() && !loader.equals("Any"))
-                    url.append("&modLoaderType=").append(loaderType(loader));
+                if (loader != null && !loader.isEmpty() && !loader.equals("Any")) {
+                    int loaderCode = loaderType(loader);
+                    if (loaderCode != 0) {
+                        url.append("&modLoaderType=").append(loaderCode);
+                    }
+                }
 
                 Request request = new Request.Builder()
                         .url(url.toString())

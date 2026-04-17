@@ -827,13 +827,21 @@ public class MainActivity extends AppCompatActivity {
         };
 
         String subFolder = "resourcepack".equals(currentProjectType) ? "resourcepacks" : "shader".equals(currentProjectType) ? "shaderpacks" : "mods";
+        String dependencyGameVersion = getSelectedVersion();
+        String dependencyLoader = getSelectedLoader();
+        if (version.gameVersions != null && !version.gameVersions.isEmpty()) {
+            dependencyGameVersion = version.gameVersions.get(0);
+        }
+        if (version.loaders != null && !version.loaders.isEmpty()) {
+            dependencyLoader = version.loaders.get(0);
+        }
         Uri instanceUri = prefs.getInstanceUri();
         if (instanceUri != null && "content".equals(instanceUri.getScheme())) {
-            downloader.downloadMod(file, instanceUri, subFolder, dependencies, getSelectedVersion(), getSelectedLoader(), callback);
+            downloader.downloadMod(file, instanceUri, subFolder, dependencies, dependencyGameVersion, dependencyLoader, callback);
         } else {
             java.io.File targetDir = getTargetDirLegacy();
             if (targetDir == null) { progress.dismiss(); showFolderPickerPrompt(); return; }
-            downloader.downloadMod(file, targetDir, dependencies, getSelectedVersion(), getSelectedLoader(), callback);
+            downloader.downloadMod(file, targetDir, dependencies, dependencyGameVersion, dependencyLoader, callback);
         }
     }
 
