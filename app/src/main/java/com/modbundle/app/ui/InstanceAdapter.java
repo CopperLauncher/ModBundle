@@ -17,12 +17,21 @@ import java.io.File;
 import java.util.List;
 
 public class InstanceAdapter extends RecyclerView.Adapter<InstanceAdapter.ViewHolder> {
-    public interface OnSelectListener { void onSelect(File instance, String instanceName); }
-    public interface OnRenameListener { void onRename(File instance, String currentName); }
-    public interface OnLogoListener { void onChangeLogo(File instance, String currentPath); }
-    public interface OnDeleteListener { void onDelete(File instance, String currentPath); }
+    public static class InstanceEntry {
+        public final String path;
+        public final boolean contentUri;
+        public InstanceEntry(String path, boolean contentUri) {
+            this.path = path;
+            this.contentUri = contentUri;
+        }
+    }
 
-    private final List<File> instances;
+    public interface OnSelectListener { void onSelect(InstanceEntry instance, String instanceName); }
+    public interface OnRenameListener { void onRename(InstanceEntry instance, String currentName); }
+    public interface OnLogoListener { void onChangeLogo(InstanceEntry instance, String currentPath); }
+    public interface OnDeleteListener { void onDelete(InstanceEntry instance, String currentPath); }
+
+    private final List<InstanceEntry> instances;
     private final OnSelectListener selectListener;
     private OnRenameListener renameListener;
     private OnLogoListener logoListener;
@@ -31,7 +40,7 @@ public class InstanceAdapter extends RecyclerView.Adapter<InstanceAdapter.ViewHo
     private final InstanceNameStore nameStore;
     private String activeInstancePath = null;
 
-    public InstanceAdapter(Context ctx, List<File> instances, OnSelectListener selectListener) {
+    public InstanceAdapter(Context ctx, List<InstanceEntry> instances, OnSelectListener selectListener) {
         this.ctx = ctx;
         this.instances = instances;
         this.selectListener = selectListener;
@@ -51,11 +60,19 @@ public class InstanceAdapter extends RecyclerView.Adapter<InstanceAdapter.ViewHo
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        File instance = instances.get(position);
-        String path = instance.getAbsolutePath();
+        InstanceEntry instance = instances.get(position);
+        String path = instance.path;
 
         String customName = nameStore.getName(path);
-        String displayName = (customName != null && !customName.isEmpty()) ? customName : instance.getName();
+        String displayName;
+        if (customName != null && !customName.isEmpty()) {
+            displayName = customName;
+        } else if (instance.contentUri) {
+            String candidate = Uri.parse(path).getLastPathSegment();
+            displayName = candidate != null && !candidate.isEmpty() ? candidate : path;
+        } else {
+            displayName = new File(path).getName();
+        }
         holder.name.setText(displayName);
         holder.path.setText(path.length() > 55 ? "..." + path.substring(path.length() - 55) : path);
 

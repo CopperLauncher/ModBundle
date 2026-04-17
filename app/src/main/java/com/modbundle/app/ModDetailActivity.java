@@ -42,6 +42,8 @@ public class ModDetailActivity extends AppCompatActivity {
     private final ModrinthApi api = new ModrinthApi();
     private final CurseForgeApi cfApi = new CurseForgeApi();
     private String source;
+    private String gameVersion = "";
+    private String loader = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,8 +56,8 @@ public class ModDetailActivity extends AppCompatActivity {
         String modJson = getIntent().getStringExtra(EXTRA_MOD);
         projectType = getIntent().getStringExtra(EXTRA_PROJECT_TYPE);
         source = getIntent().getStringExtra(EXTRA_SOURCE);
-        String gameVersion = getIntent().getStringExtra("game_version") != null ? getIntent().getStringExtra("game_version") : "";
-        String loader = getIntent().getStringExtra("loader") != null ? getIntent().getStringExtra("loader") : "";
+        gameVersion = getIntent().getStringExtra("game_version") != null ? getIntent().getStringExtra("game_version") : "";
+        loader = getIntent().getStringExtra("loader") != null ? getIntent().getStringExtra("loader") : "";
         boolean includeSnapshots = getIntent().getBooleanExtra("include_snapshots", false);
         
         if (modJson == null) { finish(); return; }

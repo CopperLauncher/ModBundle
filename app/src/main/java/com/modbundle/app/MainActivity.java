@@ -79,7 +79,7 @@ public class MainActivity extends AppCompatActivity {
     private String pendingLogoInstancePath;
     
     private InstanceAdapter instanceAdapter;
-    private final java.util.List<java.io.File> instanceList = new ArrayList<>();
+    private final java.util.List<InstanceAdapter.InstanceEntry> instanceList = new ArrayList<>();
     private ModDownloader downloader;
     private com.modbundle.app.utils.InstanceNameStore instanceNameStore;
     private PrefManager prefs;
@@ -290,12 +290,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupInstances() {
-        instanceAdapter = new InstanceAdapter(this, instanceList, (instanceFolder, name) -> {
-            android.net.Uri uri = android.net.Uri.fromFile(instanceFolder);
+        instanceAdapter = new InstanceAdapter(this, instanceList, (instanceEntry, name) -> {
+            android.net.Uri uri;
+            String path = instanceEntry.path;
+            if (path.startsWith("content://")) {
+                uri = android.net.Uri.parse(path);
+            } else {
+                uri = android.net.Uri.fromFile(new java.io.File(path));
+            }
             prefs.saveInstanceUri(uri);
             updateFolderLabel();
             updateActiveInstanceLabel();
-            instanceAdapter.setActiveInstancePath(instanceFolder.getAbsolutePath());
+            instanceAdapter.setActiveInstancePath(path);
             Toast.makeText(this, "Active: " + name, Toast.LENGTH_SHORT).show();
             // Stay on instances tab
         });
@@ -360,6 +366,7 @@ public class MainActivity extends AppCompatActivity {
                         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                         intent.addCategory(Intent.CATEGORY_OPENABLE);
                         intent.setType("image/*");
+                        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
                         startActivityForResult(intent, REQUEST_LOGO);
                     } else {
                         instanceNameStore.setLogo(path, logoNames[which]);
@@ -408,20 +415,26 @@ public class MainActivity extends AppCompatActivity {
         if (activeUri != null) {
             addInstanceFromUri(activeUri);
             Uri preferred = resolvePreferredInstanceUri(activeUri);
-            if (preferred != null && "file".equals(preferred.getScheme())) {
-                instanceAdapter.setActiveInstancePath(preferred.getPath());
+            if (preferred != null) {
+                String activePath = "file".equals(preferred.getScheme()) ? preferred.getPath() : activeUri.toString();
+                instanceAdapter.setActiveInstancePath(activePath);
             }
         }
         updateActiveInstanceLabel();
     }
 
-    private void addInstanceIfNotPresent(java.io.File instanceDir) {
-        if (instanceDir == null || !instanceDir.exists() || !instanceDir.isDirectory()) return;
-        String candidate = instanceDir.getAbsolutePath();
-        for (java.io.File file : instanceList) {
-            if (file.getAbsolutePath().equals(candidate)) return;
+    private void addInstanceIfNotPresent(InstanceAdapter.InstanceEntry instanceEntry) {
+        if (instanceEntry == null) return;
+        String path = instanceEntry.path;
+        boolean isContentUri = path.startsWith("content://");
+        if (!isContentUri) {
+            java.io.File instanceDir = new java.io.File(path);
+            if (!instanceDir.exists() || !instanceDir.isDirectory()) return;
         }
-        instanceList.add(instanceDir);
+        for (InstanceAdapter.InstanceEntry entry : instanceList) {
+            if (entry.path.equals(path)) return;
+        }
+        instanceList.add(instanceEntry);
         instanceAdapter.notifyDataSetChanged();
     }
 
@@ -444,7 +457,11 @@ public class MainActivity extends AppCompatActivity {
         if (uri == null) return;
         Uri preferred = resolvePreferredInstanceUri(uri);
         if (preferred != null && "file".equals(preferred.getScheme())) {
-            addInstanceIfNotPresent(new java.io.File(preferred.getPath()));
+            addInstanceIfNotPresent(new InstanceAdapter.InstanceEntry(preferred.getPath(), false));
+            return;
+        }
+        if (uri.toString().startsWith("content://")) {
+            addInstanceIfNotPresent(new InstanceAdapter.InstanceEntry(uri.toString(), true));
         }
     }
 
@@ -1088,6 +1105,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void openFolderPicker() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         startActivityForResult(intent, REQUEST_FOLDER);
     }
 
@@ -1128,6 +1146,8 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
             prefs.saveInstanceUri(uri);
+            addInstanceIfNotPresent(new InstanceAdapter.InstanceEntry(uri.toString(), true));
+            instanceAdapter.setActiveInstancePath(uri.toString());
             updateFolderLabel();
             updateActiveInstanceLabel();
             searchMods(true);
