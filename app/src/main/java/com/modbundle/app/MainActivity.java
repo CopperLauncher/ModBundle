@@ -31,7 +31,6 @@ import com.modbundle.app.model.SearchResponse;
 import com.modbundle.app.ui.InstalledModsAdapter;
 import com.modbundle.app.ui.ModAdapter;
 import com.modbundle.app.ui.InstanceAdapter;
-import com.modbundle.app.ui.SavedPathsAdapter;
 import java.util.ArrayList;
 import com.modbundle.app.utils.ModDownloader;
 import com.modbundle.app.utils.PrefManager;
@@ -76,7 +75,6 @@ public class MainActivity extends AppCompatActivity {
     private ImageButton btnScanInstances;
     private InstanceAdapter instanceAdapter;
     private final java.util.List<java.io.File> instanceList = new ArrayList<>();
-    private RecyclerView savedPathsRecycler;
     private ModDownloader downloader;
     private com.modbundle.app.utils.InstanceNameStore instanceNameStore;
     private PrefManager prefs;
@@ -109,7 +107,6 @@ public class MainActivity extends AppCompatActivity {
         setupInstalledRecycler();
         setupSettings();
         requestManageStoragePermission();
-        setupSavedPaths();
         setupInstances();
 
         showTab("browse");
@@ -119,7 +116,6 @@ public class MainActivity extends AppCompatActivity {
             showFolderPickerPrompt();
         } else {
             updateFolderLabel();
-            refreshSavedPaths();
         }
     }
 
@@ -279,38 +275,6 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void setupSavedPaths() {
-        refreshSavedPaths();
-    }
-
-    private void refreshSavedPaths() {
-        java.util.List<android.net.Uri> saved = prefs.getSavedPaths();
-        android.net.Uri active = prefs.getModsUri();
-        if (savedPathsRecycler == null && layoutInstances != null)
-            savedPathsRecycler = layoutInstances.findViewById(R.id.saved_paths_recycler);
-        if (savedPathsRecycler == null) return;
-        if (saved.isEmpty()) {
-            savedPathsRecycler.setVisibility(View.GONE);
-            return;
-        }
-        savedPathsRecycler.setVisibility(View.VISIBLE);
-        savedPathsRecycler.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this));
-        savedPathsRecycler.setHasFixedSize(true);
-        savedPathsRecycler.setNestedScrollingEnabled(false);
-        savedPathsRecycler.setAdapter(new SavedPathsAdapter(this, saved, active, new SavedPathsAdapter.Listener() {
-            @Override public void onUse(android.net.Uri uri) {
-                prefs.saveModsUri(uri);
-                updateFolderLabel();
-                refreshSavedPaths();
-                Toast.makeText(MainActivity.this, "Switched to saved path", Toast.LENGTH_SHORT).show();
-            }
-            @Override public void onRemove(android.net.Uri uri) {
-                prefs.removeSavedPath(uri);
-                updateFolderLabel();
-                refreshSavedPaths();
-            }
-        }));
-    }
 
     private void requestManageStoragePermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -405,7 +369,6 @@ public class MainActivity extends AppCompatActivity {
         android.view.View instLayout = layoutInstances;
         if (instLayout != null) {
             instancesRecycler = instLayout.findViewById(R.id.instances_recycler);
-            savedPathsRecycler = null; // removed from instances tab
             btnScanInstances = instLayout.findViewById(R.id.btn_scan_instances);
             ImageButton btnChooseFromInst = instLayout.findViewById(R.id.btn_choose_folder);
             ImageButton btnAddInstance = instLayout.findViewById(R.id.btn_add_instance);
@@ -418,12 +381,6 @@ public class MainActivity extends AppCompatActivity {
             }
             if (btnScanInstances != null) btnScanInstances.setOnClickListener(v -> scanForInstances());
             if (btnAddInstance != null) btnAddInstance.setOnClickListener(v -> openFolderPicker());
-            // Add auto search path button
-            android.widget.ImageButton btnAddSearchPath = instLayout.findViewById(R.id.btn_add_search_path);
-            if (btnAddSearchPath != null) btnAddSearchPath.setOnClickListener(v -> {
-                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-                startActivityForResult(intent, 5001);
-            });
         }
 
         // Set active path on adapter
@@ -495,6 +452,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupSourceToggle() {
+        boolean curseForgeAvailable = com.modbundle.app.api.CurseForgeApi.isEnabled();
+        if (!curseForgeAvailable) {
+            btnCurseForge.setEnabled(false);
+            btnCurseForge.setAlpha(0.5f);
+        }
         btnModrinth.setOnClickListener(v -> {
             useCurseForge = false;
             btnModrinth.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF9649b8));
@@ -504,6 +466,10 @@ public class MainActivity extends AppCompatActivity {
             searchMods(true);
         });
         btnCurseForge.setOnClickListener(v -> {
+            if (!curseForgeAvailable) {
+                Toast.makeText(this, "CurseForge is currently unavailable", Toast.LENGTH_SHORT).show();
+                return;
+            }
             useCurseForge = true;
             btnCurseForge.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF9649b8));
             btnCurseForge.setTextColor(0xFFFFFFFF);
@@ -736,10 +702,22 @@ public class MainActivity extends AppCompatActivity {
             curseForgeApi.getLatestFile(mod.projectId, version, loader, fileObj -> {
                 handler.post(() -> {
                     loading.dismiss();
+                    if (fileObj == null || !fileObj.has("id") || !fileObj.has("fileName")) {
+                        Toast.makeText(this, "No versions found", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
                     String fileId = fileObj.get("id").getAsString();
                     String fileName = fileObj.get("fileName").getAsString();
+                    if (fileId == null || fileId.isEmpty() || fileName == null || fileName.isEmpty()) {
+                        Toast.makeText(this, "No versions found", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
                     curseForgeApi.getDownloadUrl(mod.projectId, fileId, url -> {
                         handler.post(() -> {
+                            if (url == null || url.isEmpty()) {
+                                Toast.makeText(this, "Unable to download file", Toast.LENGTH_SHORT).show();
+                                return;
+                            }
                             new AlertDialog.Builder(this)
                                 .setTitle("Install: " + mod.title)
                                 .setMessage(fileName)
@@ -834,6 +812,10 @@ public class MainActivity extends AppCompatActivity {
         installedAdapter.notifyDataSetChanged();
 
         java.util.List<Object> modsCopy = new java.util.ArrayList<>(installedMods);
+        if (modsCopy.isEmpty()) {
+            finishCheckUpdates(0);
+            return;
+        }
         java.util.concurrent.atomic.AtomicInteger pending = new java.util.concurrent.atomic.AtomicInteger(modsCopy.size());
         java.util.concurrent.atomic.AtomicInteger updatesFound = new java.util.concurrent.atomic.AtomicInteger(0);
 
@@ -987,15 +969,6 @@ public class MainActivity extends AppCompatActivity {
         return null;
     }
 
-    private java.io.File getTargetDirLegacy() {
-        java.io.File instanceDir = getLegacyInstanceDir();
-        if (instanceDir == null) return null;
-        String sub = "resourcepack".equals(currentProjectType) ? "resourcepacks" : "shader".equals(currentProjectType) ? "shaderpacks" : "mods";
-        java.io.File target = new java.io.File(instanceDir, sub);
-        if (!target.exists()) target.mkdirs();
-        return target;
-    }
-
     private String getRealPathFromUri(Uri uri) {
         try {
             String docId = android.provider.DocumentsContract.getTreeDocumentId(uri);
@@ -1008,6 +981,15 @@ public class MainActivity extends AppCompatActivity {
         return null;
     }
 
+    private java.io.File getTargetDirLegacy() {
+        java.io.File instanceDir = getLegacyInstanceDir();
+        if (instanceDir == null) return null;
+        String sub = "resourcepack".equals(currentProjectType) ? "resourcepacks" : "shader".equals(currentProjectType) ? "shaderpacks" : "mods";
+        java.io.File target = new java.io.File(instanceDir, sub);
+        if (!target.exists()) target.mkdirs();
+        return target;
+    }
+
     private void openFolderPicker() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
         startActivityForResult(intent, REQUEST_FOLDER);
@@ -1016,23 +998,12 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == 5001 && resultCode == RESULT_OK && data != null) {
-            android.net.Uri uri = data.getData();
-            getContentResolver().takePersistableUriPermission(uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-            prefs.addSavedPath(uri);
-            scanForInstances();
-            Toast.makeText(this, "Search path added!", Toast.LENGTH_SHORT).show();
-            return;
-        }
         if (requestCode == REQUEST_FOLDER && resultCode == RESULT_OK && data != null) {
             Uri uri = data.getData();
+            if (uri == null) return;
             getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-            String realPath = getRealPathFromUri(uri);
-            Uri uriToSave = (realPath != null) ? Uri.fromFile(new java.io.File(realPath)) : uri;
-            prefs.saveInstanceUri(uriToSave);
+            prefs.saveInstanceUri(uri);
             updateFolderLabel();
-            refreshSavedPaths();
             searchMods(true);
         }
     }

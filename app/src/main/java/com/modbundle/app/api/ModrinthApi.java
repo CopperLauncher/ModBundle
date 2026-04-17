@@ -43,10 +43,10 @@ public class ModrinthApi {
                 if (gameVersion != null && !gameVersion.isEmpty() && !gameVersion.equals("Any"))
                     facets.append(",[\"versions:").append(gameVersion).append("\"]");
                 if (loader != null && !loader.isEmpty() && !loader.equals("Any"))
-                    facets.append(",[\"categories:").append(loader).append("\"]");
+                    facets.append(",[\"loaders:").append(loader).append("\"]");
                 facets.append("]");
                 StringBuilder url = new StringBuilder(BASE + "/search");
-                url.append("?facets=").append(facets);
+                url.append("?facets=").append(encode(facets.toString()));
                 url.append("&query=").append(query == null || query.isEmpty() ? "" : encode(query));
                 url.append("&limit=20&offset=").append(offset);
                 Request request = new Request.Builder()

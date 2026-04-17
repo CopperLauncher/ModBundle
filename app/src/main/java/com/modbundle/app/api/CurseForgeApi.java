@@ -14,12 +14,18 @@ import okhttp3.Response;
 public class CurseForgeApi {
     private static final String BASE = "https://api.curseforge.com/v1";
     private static final String API_KEY = KeyUtils.decode(new byte[]{0x50, 0x00, 0x00});
+    private static final boolean ENABLED = API_KEY != null && !API_KEY.contains("\u0000") && API_KEY.length() > 10;
     private final OkHttpClient client = new OkHttpClient();
     private final Gson gson = new Gson();
+
+    public static boolean isEnabled() {
+        return ENABLED;
+    }
 
     public void searchMods(String query, String gameVersion, String loader,
                            int offset, String projectType, ModrinthApi.OnSuccess<List<ModResult>> onSuccess,
                            ModrinthApi.OnError onError) {
+        if (!ENABLED) { onError.onError("CurseForge support unavailable"); return; }
         new Thread(() -> {
             try {
                 int classId = 6; // mods
@@ -66,6 +72,7 @@ public class CurseForgeApi {
     public void getDownloadUrl(String modId, String fileId,
                                ModrinthApi.OnSuccess<String> onSuccess,
                                ModrinthApi.OnError onError) {
+        if (!ENABLED) { onError.onError("CurseForge support unavailable"); return; }
         new Thread(() -> {
             try {
                 Request request = new Request.Builder()
@@ -85,6 +92,7 @@ public class CurseForgeApi {
     public void getLatestFile(String modId, String gameVersion, String loader,
                               ModrinthApi.OnSuccess<JsonObject> onSuccess,
                               ModrinthApi.OnError onError) {
+        if (!ENABLED) { onError.onError("CurseForge support unavailable"); return; }
         new Thread(() -> {
             try {
                 StringBuilder url = new StringBuilder(BASE + "/mods/" + modId + "/files?pageSize=10");

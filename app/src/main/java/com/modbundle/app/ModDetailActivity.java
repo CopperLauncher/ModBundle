@@ -130,34 +130,38 @@ public class ModDetailActivity extends AppCompatActivity {
                 cfApi.getLatestFile(mod.projectId, "", "", fileObj -> {
                     handler.post(() -> {
                         if (progress != null) progress.setVisibility(View.GONE);
-                        if (fileObj == null) {
+                        if (fileObj == null || !fileObj.has("id") || !fileObj.has("fileName")) {
                             Toast.makeText(this, "No versions found", Toast.LENGTH_SHORT).show();
                             return;
                         }
-                        try {
-                            String fileId = fileObj.get("id").getAsString();
-                            String fileName = fileObj.get("fileName").getAsString();
-                            cfApi.getDownloadUrl(mod.projectId, fileId, url -> {
-                                handler.post(() -> {
-                                    ModVersion fakeVersion = new ModVersion();
-                                    fakeVersion.versionNumber = fileName;
-                                    fakeVersion.versionType = "release";
-                                    fakeVersion.dependencies = new java.util.ArrayList<>();
-                                    ModVersion.VersionFile file = new ModVersion.VersionFile();
-                                    file.url = url;
-                                    file.filename = fileName;
-                                    file.primary = true;
-                                    fakeVersion.files = java.util.Arrays.asList(file);
-                                    VersionAdapter adapter = new VersionAdapter(
-                                        java.util.Arrays.asList(fakeVersion),
-                                        (version, f) -> startDownload(version, f));
-                                    versionsRecycler.setAdapter(adapter);
-                                });
-                            }, err -> handler.post(() ->
-                                Toast.makeText(this, "CF Error: " + err, Toast.LENGTH_SHORT).show()));
-                        } catch (Exception e) {
-                            Toast.makeText(this, "Error parsing version data", Toast.LENGTH_SHORT).show();
+                        String fileId = fileObj.get("id").getAsString();
+                        String fileName = fileObj.get("fileName").getAsString();
+                        if (fileId == null || fileId.isEmpty() || fileName == null || fileName.isEmpty()) {
+                            Toast.makeText(this, "No versions found", Toast.LENGTH_SHORT).show();
+                            return;
                         }
+                        cfApi.getDownloadUrl(mod.projectId, fileId, url -> {
+                            handler.post(() -> {
+                                if (url == null || url.isEmpty()) {
+                                    Toast.makeText(this, "Unable to download file", Toast.LENGTH_SHORT).show();
+                                    return;
+                                }
+                                ModVersion fakeVersion = new ModVersion();
+                                fakeVersion.versionNumber = fileName;
+                                fakeVersion.versionType = "release";
+                                fakeVersion.dependencies = new java.util.ArrayList<>();
+                                ModVersion.VersionFile file = new ModVersion.VersionFile();
+                                file.url = url;
+                                file.filename = fileName;
+                                file.primary = true;
+                                fakeVersion.files = java.util.Arrays.asList(file);
+                                VersionAdapter adapter = new VersionAdapter(
+                                    java.util.Arrays.asList(fakeVersion),
+                                    (version, f) -> startDownload(version, f));
+                                versionsRecycler.setAdapter(adapter);
+                            });
+                        }, err -> handler.post(() ->
+                            Toast.makeText(this, "CF Error: " + err, Toast.LENGTH_SHORT).show()));
                     });
                 }, error -> handler.post(() -> {
                     if (progress != null) progress.setVisibility(View.GONE);
