@@ -1168,6 +1168,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void saveFilters() { prefs.saveFilters(getSelectedVersion(), getSelectedLoader()); }
-    private String getSelectedVersion() { String v = (String) spinnerVersion.getSelectedItem(); return "Any".equals(v) ? "" : v; }
-    private String getSelectedLoader() { String l = (String) spinnerLoader.getSelectedItem(); return "Any".equals(l) ? "" : l; }
+    private String getSelectedVersion() {
+        String v = spinnerVersion.getSelectedItem() != null ? ((String) spinnerVersion.getSelectedItem()).trim() : "";
+        return "Any".equalsIgnoreCase(v) ? "" : v;
+    }
+    private String getSelectedLoader() {
+        String l = spinnerLoader.getSelectedItem() != null ? ((String) spinnerLoader.getSelectedItem()).trim() : "";
+        return "Any".equalsIgnoreCase(l) ? "" : l.toLowerCase();
+    }
 }
