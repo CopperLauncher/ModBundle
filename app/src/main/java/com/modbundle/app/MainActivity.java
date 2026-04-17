@@ -349,20 +349,8 @@ public class MainActivity extends AppCompatActivity {
         instanceAdapter.setLogoListener((instance, path) -> {
             String[] logoNames = {"ic_fabric", "ic_quilt", "ic_forge", "ic_neoforge", "gallery"};
             String[] labels = {"Fabric", "Quilt", "Forge", "NeoForge", "Gallery"};
-            int[] iconResIds = {R.drawable.ic_fabric, R.drawable.ic_quilt, R.drawable.ic_forge, R.drawable.ic_neoforge, 0};
 
-            ArrayAdapter<String> logoAdapter = new ArrayAdapter<String>(this, android.R.layout.select_dialog_item, labels) {
-                @NonNull
-                @Override
-                public View getView(int position, View convertView, @NonNull ViewGroup parent) {
-                    TextView item = (TextView) super.getView(position, convertView, parent);
-                    if (iconResIds[position] != 0) {
-                        item.setCompoundDrawablesWithIntrinsicBounds(iconResIds[position], 0, 0, 0);
-                        item.setCompoundDrawablePadding((int) (12 * getResources().getDisplayMetrics().density));
-                    }
-                    return item;
-                }
-            };
+            ArrayAdapter<String> logoAdapter = new ArrayAdapter<>(this, android.R.layout.select_dialog_item, labels);
 
             new AlertDialog.Builder(this)
                 .setTitle("Choose Logo")
@@ -769,7 +757,7 @@ public class MainActivity extends AppCompatActivity {
                                     ModVersion fakeVersion = new ModVersion();
                                     fakeVersion.versionNumber = fileName;
                                     fakeVersion.dependencies = new java.util.ArrayList<>();
-                                    startDownload(mod, fakeVersion, file);
+                                    showDependencySelectionDialog(mod, fakeVersion, file);
                                 })
                                 .setNegativeButton("Cancel", null)
                                 .show();
@@ -801,7 +789,7 @@ public class MainActivity extends AppCompatActivity {
                     .setItems(labels, (d, which) -> {
                         ModVersion selected = versions.get(which);
                         ModVersion.VersionFile file = ModDownloader.getPrimaryFile(selected);
-                        if (file != null) startDownload(mod, selected, file);
+                        if (file != null) showDependencySelectionDialog(mod, selected, file);
                     })
                     .setNegativeButton("Cancel", null).show();
             });
@@ -809,6 +797,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startDownload(ModResult mod, ModVersion version, ModVersion.VersionFile file) {
+        startDownload(mod, version, file, version.dependencies);
+    }
+
+    private void startDownload(ModResult mod, ModVersion version, ModVersion.VersionFile file, List<ModVersion.Dependency> dependencies) {
         ProgressDialog progress = new ProgressDialog(this);
         progress.setTitle("Installing " + mod.title);
         progress.setMessage("Downloading…");
@@ -837,12 +829,54 @@ public class MainActivity extends AppCompatActivity {
         String subFolder = "resourcepack".equals(currentProjectType) ? "resourcepacks" : "shader".equals(currentProjectType) ? "shaderpacks" : "mods";
         Uri instanceUri = prefs.getInstanceUri();
         if (instanceUri != null && "content".equals(instanceUri.getScheme())) {
-            downloader.downloadMod(file, instanceUri, subFolder, version.dependencies, getSelectedVersion(), getSelectedLoader(), callback);
+            downloader.downloadMod(file, instanceUri, subFolder, dependencies, getSelectedVersion(), getSelectedLoader(), callback);
         } else {
             java.io.File targetDir = getTargetDirLegacy();
             if (targetDir == null) { progress.dismiss(); showFolderPickerPrompt(); return; }
-            downloader.downloadMod(file, targetDir, version.dependencies, getSelectedVersion(), getSelectedLoader(), callback);
+            downloader.downloadMod(file, targetDir, dependencies, getSelectedVersion(), getSelectedLoader(), callback);
         }
+    }
+
+    private void showDependencySelectionDialog(ModResult mod, ModVersion version, ModVersion.VersionFile file) {
+        if (version.dependencies == null || version.dependencies.isEmpty()) {
+            startDownload(mod, version, file);
+            return;
+        }
+
+        java.util.List<ModVersion.Dependency> deps = new java.util.ArrayList<>();
+        java.util.List<String> labels = new java.util.ArrayList<>();
+        java.util.List<Boolean> checked = new java.util.ArrayList<>();
+        for (ModVersion.Dependency dep : version.dependencies) {
+            if (dep == null || dep.projectId == null) continue;
+            deps.add(dep);
+            String type = dep.dependencyType != null ? dep.dependencyType : "required";
+            labels.add(("required".equals(type) ? "Required: " : "Optional: ") + dep.projectId);
+            checked.add("required".equals(type));
+        }
+
+        if (deps.isEmpty()) {
+            startDownload(mod, version, file);
+            return;
+        }
+
+        CharSequence[] items = labels.toArray(new CharSequence[0]);
+        boolean[] initialChecked = new boolean[checked.size()];
+        for (int i = 0; i < checked.size(); i++) initialChecked[i] = checked.get(i);
+
+        new AlertDialog.Builder(this)
+            .setTitle("Install dependencies")
+            .setMessage("Select which dependencies to install with this mod.")
+            .setMultiChoiceItems(items, initialChecked, (dialog, which, isChecked) -> initialChecked[which] = isChecked)
+            .setPositiveButton("Install selected", (d, w) -> {
+                List<ModVersion.Dependency> selectedDeps = new ArrayList<>();
+                for (int i = 0; i < deps.size(); i++) {
+                    if (initialChecked[i]) selectedDeps.add(deps.get(i));
+                }
+                startDownload(mod, version, file, selectedDeps);
+            })
+            .setNeutralButton("Install without deps", (d, w) -> startDownload(mod, version, file, new ArrayList<>()))
+            .setNegativeButton("Cancel", null)
+            .show();
     }
 
     private void checkUpdates() {
@@ -1063,6 +1097,7 @@ public class MainActivity extends AppCompatActivity {
                 if (instanceDir.exists() && instanceDir.isDirectory()) {
                     prefs.saveInstanceUri(preferred);
                     addInstanceIfNotPresent(instanceDir);
+                    instanceAdapter.setActiveInstancePath(instanceDir.getAbsolutePath());
                     updateFolderLabel();
                     updateActiveInstanceLabel();
                     searchMods(true);
@@ -1077,6 +1112,7 @@ public class MainActivity extends AppCompatActivity {
                 if (instanceDir.exists() && instanceDir.isDirectory()) {
                     prefs.saveInstanceUri(uri);
                     addInstanceIfNotPresent(instanceDir);
+                    instanceAdapter.setActiveInstancePath(instanceDir.getAbsolutePath());
                     updateFolderLabel();
                     updateActiveInstanceLabel();
                     searchMods(true);
