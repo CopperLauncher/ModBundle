@@ -383,15 +383,40 @@ public class MainActivity extends AppCompatActivity {
             if (btnAddInstance != null) btnAddInstance.setOnClickListener(v -> openFolderPicker());
         }
 
-        // Set active path on adapter
+        // Set active path on adapter and restore saved instance to the list
         android.net.Uri activeUri = prefs.getInstanceUri();
-        if (activeUri != null && "file".equals(activeUri.getScheme())) {
-            instanceAdapter.setActiveInstancePath(activeUri.getPath());
+        if (activeUri != null) {
+            addInstanceFromUri(activeUri);
+            if ("file".equals(activeUri.getScheme())) {
+                instanceAdapter.setActiveInstancePath(activeUri.getPath());
+            }
         }
         if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R) {
             scanForInstances();
         }
         updateActiveInstanceLabel();
+    }
+
+    private void addInstanceIfNotPresent(java.io.File instanceDir) {
+        if (instanceDir == null || !instanceDir.exists() || !instanceDir.isDirectory()) return;
+        String candidate = instanceDir.getAbsolutePath();
+        for (java.io.File file : instanceList) {
+            if (file.getAbsolutePath().equals(candidate)) return;
+        }
+        instanceList.add(instanceDir);
+        instanceAdapter.notifyDataSetChanged();
+    }
+
+    private void addInstanceFromUri(Uri uri) {
+        if (uri == null) return;
+        java.io.File instanceDir = null;
+        if ("file".equals(uri.getScheme())) {
+            instanceDir = new java.io.File(uri.getPath());
+        } else if ("content".equals(uri.getScheme())) {
+            String realPath = getRealPathFromUri(uri);
+            if (realPath != null) instanceDir = new java.io.File(realPath);
+        }
+        addInstanceIfNotPresent(instanceDir);
     }
 
     private void updateActiveInstanceLabel() {
@@ -1003,7 +1028,9 @@ public class MainActivity extends AppCompatActivity {
             if (uri == null) return;
             getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
             prefs.saveInstanceUri(uri);
+            addInstanceFromUri(uri);
             updateFolderLabel();
+            updateActiveInstanceLabel();
             searchMods(true);
         }
     }
