@@ -27,7 +27,6 @@
             android:textColor="#FFFFFF"
             android:textSize="18sp"
             android:textStyle="bold"/>
-        <!-- Add auto search path -->
         <ImageButton
             android:id="@+id/btn_add_search_path"
             android:layout_width="40dp"
@@ -37,7 +36,6 @@
             android:tint="#888888"
             android:contentDescription="Add auto search path"
             android:layout_marginEnd="4dp"/>
-        <!-- Scan for instances -->
         <ImageButton
             android:id="@+id/btn_scan_instances"
             android:layout_width="40dp"
@@ -47,7 +45,6 @@
             android:tint="#888888"
             android:contentDescription="Scan instances"
             android:layout_marginEnd="4dp"/>
-        <!-- Manually pick instance folder -->
         <ImageButton
             android:id="@+id/btn_add_instance"
             android:layout_width="40dp"
@@ -86,6 +83,34 @@
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:background="#2e2e2e"/>
+
+    <!-- Saved paths section -->
+    <TextView
+        android:id="@+id/tv_saved_paths_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Saved Paths"
+        android:textColor="#888888"
+        android:textSize="11sp"
+        android:textAllCaps="true"
+        android:letterSpacing="0.08"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="4dp"/>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/saved_paths_recycler"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="10dp"
+        android:clipToPadding="false"
+        android:visibility="gone"/>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#2e2e2e"
+        android:layout_marginTop="6dp"/>
 
     <!-- Instance list -->
     <androidx.recyclerview.widget.RecyclerView
