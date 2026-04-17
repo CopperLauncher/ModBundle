@@ -1018,11 +1018,24 @@ public class MainActivity extends AppCompatActivity {
     private String getRealPathFromUri(Uri uri) {
         try {
             String docId = android.provider.DocumentsContract.getTreeDocumentId(uri);
+            if (docId == null) return null;
             docId = java.net.URLDecoder.decode(docId, "UTF-8");
-            String[] split = docId.split(":");
-            if (split.length >= 2 && "primary".equalsIgnoreCase(split[0])) {
-                return android.os.Environment.getExternalStorageDirectory() + "/" + split[1];
+            if (docId.startsWith("raw:")) {
+                return docId.substring(4);
             }
+            String[] split = docId.split(":", 2);
+            if (split.length == 0) return null;
+            String volume = split[0];
+            String pathPart = split.length > 1 ? split[1] : "";
+            if (volume.isEmpty()) return null;
+            if ("primary".equalsIgnoreCase(volume)) {
+                if (pathPart.isEmpty()) return android.os.Environment.getExternalStorageDirectory().getAbsolutePath();
+                return android.os.Environment.getExternalStorageDirectory().getAbsolutePath() + "/" + pathPart;
+            }
+            if (pathPart.isEmpty()) {
+                return "/storage/" + volume;
+            }
+            return "/storage/" + volume + "/" + pathPart;
         } catch (Exception e) {}
         return null;
     }
