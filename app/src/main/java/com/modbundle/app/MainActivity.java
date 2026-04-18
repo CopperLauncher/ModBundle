@@ -11,6 +11,7 @@ import android.os.Environment;
 import android.Manifest;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.widget.CompoundButtonCompat;
 import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.os.Looper;
@@ -351,7 +352,7 @@ public class MainActivity extends AppCompatActivity {
             android.widget.CheckBox cbSnap = new android.widget.CheckBox(this);
             cbSnap.setText("Include Snapshots");
             cbSnap.setTextColor(0xFFAAAAAA);
-            cbSnap.setButtonTint(android.content.res.ColorStateList.valueOf(0xFF9649b8));
+            CompoundButtonCompat.setButtonTintList(cbSnap, android.content.res.ColorStateList.valueOf(0xFF9649b8));
             cbSnap.setChecked(false);
             layout.addView(cbSnap);
 
