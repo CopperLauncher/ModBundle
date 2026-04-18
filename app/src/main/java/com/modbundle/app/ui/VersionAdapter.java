@@ -42,14 +42,20 @@ public class VersionAdapter extends RecyclerView.Adapter<VersionAdapter.ViewHold
         // Game versions
         if (v.gameVersions != null && !v.gameVersions.isEmpty()) {
             holder.gameVersions.setText(String.join(" • ", v.gameVersions.subList(0, Math.min(3, v.gameVersions.size()))));
+        } else {
+            holder.gameVersions.setText("");
         }
         // Loaders
         if (v.loaders != null && !v.loaders.isEmpty()) {
             holder.loaders.setText(String.join(", ", v.loaders));
+        } else {
+            holder.loaders.setText("");
         }
         // Date
         if (v.datePublished != null) {
             holder.date.setText(v.datePublished.substring(0, Math.min(10, v.datePublished.length())));
+        } else {
+            holder.date.setText("");
         }
 
         holder.btnDownload.setOnClickListener(view -> {

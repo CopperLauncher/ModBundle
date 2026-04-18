@@ -9,6 +9,7 @@ import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -41,6 +42,8 @@ public class ModDetailActivity extends AppCompatActivity {
     private final ModrinthApi api = new ModrinthApi();
     private final CurseForgeApi cfApi = new CurseForgeApi();
     private String source;
+    private String gameVersion = "";
+    private String loader = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,8 +56,8 @@ public class ModDetailActivity extends AppCompatActivity {
         String modJson = getIntent().getStringExtra(EXTRA_MOD);
         projectType = getIntent().getStringExtra(EXTRA_PROJECT_TYPE);
         source = getIntent().getStringExtra(EXTRA_SOURCE);
-        String gameVersion = getIntent().getStringExtra("game_version") != null ? getIntent().getStringExtra("game_version") : "";
-        String loader = getIntent().getStringExtra("loader") != null ? getIntent().getStringExtra("loader") : "";
+        gameVersion = getIntent().getStringExtra("game_version") != null ? getIntent().getStringExtra("game_version") : "";
+        loader = getIntent().getStringExtra("loader") != null ? getIntent().getStringExtra("loader") : "";
         boolean includeSnapshots = getIntent().getBooleanExtra("include_snapshots", false);
         
         if (modJson == null) { finish(); return; }
@@ -130,34 +133,38 @@ public class ModDetailActivity extends AppCompatActivity {
                 cfApi.getLatestFile(mod.projectId, "", "", fileObj -> {
                     handler.post(() -> {
                         if (progress != null) progress.setVisibility(View.GONE);
-                        if (fileObj == null) {
+                        if (fileObj == null || !fileObj.has("id") || !fileObj.has("fileName")) {
                             Toast.makeText(this, "No versions found", Toast.LENGTH_SHORT).show();
                             return;
                         }
-                        try {
-                            String fileId = fileObj.get("id").getAsString();
-                            String fileName = fileObj.get("fileName").getAsString();
-                            cfApi.getDownloadUrl(mod.projectId, fileId, url -> {
-                                handler.post(() -> {
-                                    ModVersion fakeVersion = new ModVersion();
-                                    fakeVersion.versionNumber = fileName;
-                                    fakeVersion.versionType = "release";
-                                    fakeVersion.dependencies = new java.util.ArrayList<>();
-                                    ModVersion.VersionFile file = new ModVersion.VersionFile();
-                                    file.url = url;
-                                    file.filename = fileName;
-                                    file.primary = true;
-                                    fakeVersion.files = java.util.Arrays.asList(file);
-                                    VersionAdapter adapter = new VersionAdapter(
-                                        java.util.Arrays.asList(fakeVersion),
-                                        (version, f) -> startDownload(version, f));
-                                    versionsRecycler.setAdapter(adapter);
-                                });
-                            }, err -> handler.post(() ->
-                                Toast.makeText(this, "CF Error: " + err, Toast.LENGTH_SHORT).show()));
-                        } catch (Exception e) {
-                            Toast.makeText(this, "Error parsing version data", Toast.LENGTH_SHORT).show();
+                        String fileId = fileObj.get("id").getAsString();
+                        String fileName = fileObj.get("fileName").getAsString();
+                        if (fileId == null || fileId.isEmpty() || fileName == null || fileName.isEmpty()) {
+                            Toast.makeText(this, "No versions found", Toast.LENGTH_SHORT).show();
+                            return;
                         }
+                        cfApi.getDownloadUrl(mod.projectId, fileId, url -> {
+                            handler.post(() -> {
+                                if (url == null || url.isEmpty()) {
+                                    Toast.makeText(this, "Unable to download file", Toast.LENGTH_SHORT).show();
+                                    return;
+                                }
+                                ModVersion fakeVersion = new ModVersion();
+                                fakeVersion.versionNumber = fileName;
+                                fakeVersion.versionType = "release";
+                                fakeVersion.dependencies = new java.util.ArrayList<>();
+                                ModVersion.VersionFile file = new ModVersion.VersionFile();
+                                file.url = url;
+                                file.filename = fileName;
+                                file.primary = true;
+                                fakeVersion.files = java.util.Arrays.asList(file);
+                                VersionAdapter adapter = new VersionAdapter(
+                                    java.util.Arrays.asList(fakeVersion),
+                                    (version, f) -> startDownload(version, f));
+                                versionsRecycler.setAdapter(adapter);
+                            });
+                        }, err -> handler.post(() ->
+                            Toast.makeText(this, "CF Error: " + err, Toast.LENGTH_SHORT).show()));
                     });
                 }, error -> handler.post(() -> {
                     if (progress != null) progress.setVisibility(View.GONE);
@@ -177,7 +184,7 @@ public class ModDetailActivity extends AppCompatActivity {
                             if ("release".equals(vType) || includeSnapshots) filtered.add(v);
                         }
                         VersionAdapter adapter = new VersionAdapter(filtered, (version, file) ->
-                            startDownload(version, file));
+                            confirmDependenciesAndStartDownload(version, file));
                         versionsRecycler.setAdapter(adapter);
                     });
                 }, error -> handler.post(() -> {
@@ -230,6 +237,93 @@ public class ModDetailActivity extends AppCompatActivity {
             java.io.File targetDir = new java.io.File(instanceDir, subFolder);
             if (!targetDir.exists()) targetDir.mkdirs();
             downloader.downloadMod(file, targetDir, version.dependencies, "", "", callback);
+        }
+    }
+
+    private void confirmDependenciesAndStartDownload(ModVersion version, ModVersion.VersionFile file) {
+        if (version.dependencies == null || version.dependencies.isEmpty()) {
+            startDownload(version, file, version.dependencies);
+            return;
+        }
+
+        java.util.List<ModVersion.Dependency> deps = new java.util.ArrayList<>();
+        java.util.List<String> labels = new java.util.ArrayList<>();
+        java.util.List<Boolean> checked = new java.util.ArrayList<>();
+        for (ModVersion.Dependency dep : version.dependencies) {
+            if (dep == null || dep.projectId == null) continue;
+            deps.add(dep);
+            String type = dep.dependencyType != null ? dep.dependencyType : "required";
+            labels.add(("required".equals(type) ? "Required: " : "Optional: ") + dep.projectId);
+            checked.add("required".equals(type));
+        }
+
+        if (deps.isEmpty()) {
+            startDownload(version, file, version.dependencies);
+            return;
+        }
+
+        CharSequence[] items = labels.toArray(new CharSequence[0]);
+        boolean[] selected = new boolean[checked.size()];
+        for (int i = 0; i < checked.size(); i++) selected[i] = checked.get(i);
+
+        new AlertDialog.Builder(this)
+            .setTitle("Install dependencies")
+            .setMessage("Select which dependencies to install with this mod.")
+            .setMultiChoiceItems(items, selected, (dialog, which, isChecked) -> selected[which] = isChecked)
+            .setPositiveButton("Install selected", (d, w) -> {
+                java.util.List<ModVersion.Dependency> selectedDeps = new java.util.ArrayList<>();
+                for (int i = 0; i < deps.size(); i++) {
+                    if (selected[i]) selectedDeps.add(deps.get(i));
+                }
+                startDownload(version, file, selectedDeps);
+            })
+            .setNeutralButton("Install without deps", (d, w) -> startDownload(version, file, new java.util.ArrayList<>()))
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    private void startDownload(ModVersion version, ModVersion.VersionFile file, java.util.List<ModVersion.Dependency> dependencies) {
+        String subFolder = "resourcepack".equals(projectType) ? "resourcepacks"
+                         : "shader".equals(projectType) ? "shaderpacks" : "mods";
+
+        ProgressDialog pDialog = new ProgressDialog(this);
+        pDialog.setTitle("Installing " + mod.title);
+        pDialog.setMessage("Downloading…");
+        pDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+        pDialog.setMax(100);
+        pDialog.setCancelable(false);
+        pDialog.show();
+
+        ModDownloader.DownloadCallback callback = new ModDownloader.DownloadCallback() {
+            public void onProgress(String fileName, int percent) {
+                handler.post(() -> { pDialog.setMessage(fileName); pDialog.setProgress(percent); });
+            }
+            public void onSuccess(String fileName) {
+                handler.post(() -> {
+                    pDialog.dismiss();
+                    Toast.makeText(ModDetailActivity.this, mod.title + " installed!", Toast.LENGTH_SHORT).show();
+                    finish();
+                });
+            }
+            public void onError(String error) {
+                handler.post(() -> {
+                    pDialog.dismiss();
+                    Toast.makeText(ModDetailActivity.this, "Install failed: " + error, Toast.LENGTH_LONG).show();
+                });
+            }
+        };
+
+        Uri instanceUri = prefs.getInstanceUri();
+        if (instanceUri != null && "content".equals(instanceUri.getScheme())) {
+            downloader.downloadMod(file, instanceUri, subFolder,
+                dependencies, gameVersion, loader, callback);
+        } else {
+            java.io.File instanceDir = prefs.getInstanceUri() != null
+                ? new java.io.File(prefs.getInstanceUri().getPath()) : null;
+            if (instanceDir == null) { pDialog.dismiss(); return; }
+            java.io.File targetDir = new java.io.File(instanceDir, subFolder);
+            if (!targetDir.exists()) targetDir.mkdirs();
+            downloader.downloadMod(file, targetDir, dependencies, gameVersion, loader, callback);
         }
     }
 

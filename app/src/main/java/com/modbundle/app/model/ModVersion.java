@@ -23,6 +23,7 @@ public class ModVersion {
 
     public static class Dependency {
         @SerializedName("project_id")    public String projectId;
+        @SerializedName("version_id")    public String versionId;
         @SerializedName("dependency_type") public String dependencyType; // "required" or "optional"
     }
 }

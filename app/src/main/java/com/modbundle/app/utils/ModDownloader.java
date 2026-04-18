@@ -41,24 +41,8 @@ public class ModDownloader {
                 if (dependencies != null) {
                     DocumentFile modsDir = getOrCreateSubFolder(instanceUri, "mods");
                     for (ModVersion.Dependency dep : dependencies) {
-                        if ("required".equals(dep.dependencyType) && dep.projectId != null && modsDir != null) {
-                            if (modsDir.findFile(dep.projectId) != null) continue;
-                            api.getVersions(dep.projectId, gameVersion, loader, versions -> {
-                                if (versions != null && !versions.isEmpty()) {
-                                    ModVersion dv = versions.get(0);
-                                    if (dv.files != null && !dv.files.isEmpty()) {
-                                        ModVersion.VersionFile df = getPrimaryFile(dv.files);
-                                        try { downloadFileSaf(df.url, df.filename, modsDir,
-                                            new DownloadCallback() {
-                                                public void onProgress(String f, int p) {}
-                                                public void onSuccess(String f) { callback.onProgress("Dep: " + f, 100); }
-                                                public void onError(String e) {}
-                                            });
-                                        } catch (Exception ignored) {}
-                                    }
-                                }
-                            }, e -> {});
-                        }
+                        if (dep == null || dep.projectId == null || modsDir == null) continue;
+                        installDependencySaf(dep, modsDir, gameVersion, loader, callback);
                     }
                 }
             } catch (Exception e) { callback.onError("Download failed: " + e.getMessage()); }
@@ -75,28 +59,81 @@ public class ModDownloader {
                 if (dependencies != null) {
                     File modsDir = new File(targetDir.getParent(), "mods");
                     for (ModVersion.Dependency dep : dependencies) {
-                        if ("required".equals(dep.dependencyType) && dep.projectId != null) {
-                            if (new File(modsDir, dep.projectId).exists()) continue;
-                            api.getVersions(dep.projectId, gameVersion, loader, versions -> {
-                                if (versions != null && !versions.isEmpty()) {
-                                    ModVersion dv = versions.get(0);
-                                    if (dv.files != null && !dv.files.isEmpty()) {
-                                        ModVersion.VersionFile df = getPrimaryFile(dv.files);
-                                        try { downloadFile(df.url, df.filename, modsDir,
-                                            new DownloadCallback() {
-                                                public void onProgress(String f, int p) {}
-                                                public void onSuccess(String f) { callback.onProgress("Dep: " + f, 100); }
-                                                public void onError(String e) {}
-                                            });
-                                        } catch (Exception ignored) {}
-                                    }
-                                }
-                            }, e -> {});
-                        }
+                        if (dep == null || dep.projectId == null) continue;
+                        installDependencyLegacy(dep, modsDir, gameVersion, loader, callback);
                     }
                 }
             } catch (Exception e) { callback.onError("Download failed: " + e.getMessage()); }
         }).start();
+    }
+
+    private void installDependencySaf(ModVersion.Dependency dep, DocumentFile modsDir,
+                                      String gameVersion, String loader, DownloadCallback callback) {
+        if (dep.versionId != null && !dep.versionId.isEmpty()) {
+            api.getVersion(dep.versionId, version -> {
+                if (version != null && version.files != null && !version.files.isEmpty()) {
+                    ModVersion.VersionFile df = getPrimaryFile(version.files);
+                    try {
+                        downloadFileSaf(df.url, df.filename, modsDir, new DownloadCallback() {
+                            public void onProgress(String f, int p) {}
+                            public void onSuccess(String f) { callback.onProgress("Dep: " + f, 100); }
+                            public void onError(String e) {}
+                        });
+                    } catch (Exception ignored) {}
+                }
+            }, e -> {});
+            return;
+        }
+        api.getVersions(dep.projectId, gameVersion, loader, versions -> {
+            if (versions != null && !versions.isEmpty()) {
+                ModVersion dv = versions.get(0);
+                if (dv.files != null && !dv.files.isEmpty()) {
+                    ModVersion.VersionFile df = getPrimaryFile(dv.files);
+                    try {
+                        downloadFileSaf(df.url, df.filename, modsDir, new DownloadCallback() {
+                            public void onProgress(String f, int p) {}
+                            public void onSuccess(String f) { callback.onProgress("Dep: " + f, 100); }
+                            public void onError(String e) {}
+                        });
+                    } catch (Exception ignored) {}
+                }
+            }
+        }, e -> {});
+    }
+
+    private void installDependencyLegacy(ModVersion.Dependency dep, File modsDir,
+                                         String gameVersion, String loader, DownloadCallback callback) {
+        if (!modsDir.exists()) modsDir.mkdirs();
+        if (dep.versionId != null && !dep.versionId.isEmpty()) {
+            api.getVersion(dep.versionId, version -> {
+                if (version != null && version.files != null && !version.files.isEmpty()) {
+                    ModVersion.VersionFile df = getPrimaryFile(version.files);
+                    try {
+                        downloadFile(df.url, df.filename, modsDir, new DownloadCallback() {
+                            public void onProgress(String f, int p) {}
+                            public void onSuccess(String f) { callback.onProgress("Dep: " + f, 100); }
+                            public void onError(String e) {}
+                        });
+                    } catch (Exception ignored) {}
+                }
+            }, e -> {});
+            return;
+        }
+        api.getVersions(dep.projectId, gameVersion, loader, versions -> {
+            if (versions != null && !versions.isEmpty()) {
+                ModVersion dv = versions.get(0);
+                if (dv.files != null && !dv.files.isEmpty()) {
+                    ModVersion.VersionFile df = getPrimaryFile(dv.files);
+                    try {
+                        downloadFile(df.url, df.filename, modsDir, new DownloadCallback() {
+                            public void onProgress(String f, int p) {}
+                            public void onSuccess(String f) { callback.onProgress("Dep: " + f, 100); }
+                            public void onError(String e) {}
+                        });
+                    } catch (Exception ignored) {}
+                }
+            }
+        }, e -> {});
     }
 
     private DocumentFile getOrCreateSubFolder(Uri instanceUri, String folderName) {
@@ -108,11 +145,12 @@ public class ModDownloader {
     }
 
     private void downloadFileSaf(String url, String fileName, DocumentFile dir, DownloadCallback callback) throws Exception {
-        DocumentFile existing = dir.findFile(fileName);
-        if (existing != null) existing.delete();
+        String tempName = fileName + ".download";
+        DocumentFile tempFile = dir.findFile(tempName);
+        if (tempFile != null) tempFile.delete();
         String mime = fileName.endsWith(".jar") ? "application/java-archive" : "application/zip";
-        DocumentFile newFile = dir.createFile(mime, fileName);
-        if (newFile == null) throw new Exception("Cannot create file: " + fileName);
+        DocumentFile newFile = dir.createFile(mime, tempName);
+        if (newFile == null) throw new Exception("Cannot create file: " + tempName);
         Request request = new Request.Builder().url(url).build();
         try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) throw new Exception("HTTP " + response.code());
@@ -126,27 +164,48 @@ public class ModDownloader {
                     if (total > 0) callback.onProgress(fileName, (int)(downloaded * 100 / total));
                 }
             }
+        } catch (Exception e) {
+            DocumentFile failed = dir.findFile(tempName);
+            if (failed != null) failed.delete();
+            throw e;
+        }
+        DocumentFile existing = dir.findFile(fileName);
+        if (existing != null) existing.delete();
+        if (!newFile.renameTo(fileName)) {
+            DocumentFile failed = dir.findFile(tempName);
+            if (failed != null) failed.delete();
+            throw new Exception("Cannot rename downloaded file");
         }
         callback.onSuccess(fileName);
     }
 
     private void downloadFile(String url, String fileName, File dir, DownloadCallback callback) throws Exception {
         if (!dir.exists()) dir.mkdirs();
+        File tempFile = new File(dir, fileName + ".download");
+        if (tempFile.exists()) tempFile.delete();
         Request request = new Request.Builder().url(url).build();
         try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) throw new Exception("HTTP " + response.code());
             long total = response.body().contentLength();
-            File outFile = new File(dir, fileName);
             try (InputStream in = response.body().byteStream();
-                 FileOutputStream out = new FileOutputStream(outFile)) {
+                 FileOutputStream out = new FileOutputStream(tempFile)) {
                 byte[] buf = new byte[8192]; long downloaded = 0; int read;
                 while ((read = in.read(buf)) != -1) {
                     out.write(buf, 0, read); downloaded += read;
                     if (total > 0) callback.onProgress(fileName, (int)(downloaded * 100 / total));
                 }
             }
-            callback.onSuccess(fileName);
+        } catch (Exception e) {
+            if (tempFile.exists()) tempFile.delete();
+            throw e;
         }
+        File finalFile = new File(dir, fileName);
+        if (finalFile.exists()) finalFile.delete();
+        if (!tempFile.renameTo(finalFile)) {
+            tempFile.delete();
+            throw new Exception("Cannot rename downloaded file");
+        }
+        callback.onSuccess(fileName);
     }
 
     private ModVersion.VersionFile getPrimaryFile(List<ModVersion.VersionFile> files) {

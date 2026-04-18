@@ -17,7 +17,9 @@ import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.*;
+import androidx.annotation.NonNull;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -31,7 +33,6 @@ import com.modbundle.app.model.SearchResponse;
 import com.modbundle.app.ui.InstalledModsAdapter;
 import com.modbundle.app.ui.ModAdapter;
 import com.modbundle.app.ui.InstanceAdapter;
-import com.modbundle.app.ui.SavedPathsAdapter;
 import java.util.ArrayList;
 import com.modbundle.app.utils.ModDownloader;
 import com.modbundle.app.utils.PrefManager;
@@ -43,6 +44,7 @@ import java.util.List;
 public class MainActivity extends AppCompatActivity {
 
     private static final int REQUEST_FOLDER = 3001;
+    private static final int REQUEST_LOGO = 3002;
 
     // Views
     private View layoutBrowse, layoutInstalled, layoutSettings, layoutInstances;
@@ -51,7 +53,7 @@ public class MainActivity extends AppCompatActivity {
     private RecyclerView browseRecycler, installedRecycler;
     private TextView emptyBrowse, emptyInstalled, tvFolderPath;
     private ProgressBar browseProgress;
-    private Button btnLoadMore, btnChooseFolder;
+    private Button btnChooseFolder;
 
     // State
     private final List<ModResult> modResults = new ArrayList<>();
@@ -61,6 +63,7 @@ public class MainActivity extends AppCompatActivity {
 
     private final ModrinthApi api = new ModrinthApi();
     private final CurseForgeApi curseForgeApi = new CurseForgeApi();
+    private boolean hasMoreResults = true;
     private boolean useCurseForge = false;
     private String currentProjectType = "mod";
     private Button btnModrinth, btnCurseForge;
@@ -73,10 +76,10 @@ public class MainActivity extends AppCompatActivity {
     private android.widget.CheckBox btnSnapshots;
     private boolean includeSnapshots = false;
     private RecyclerView instancesRecycler;
-    private ImageButton btnScanInstances;
+    private String pendingLogoInstancePath;
+    
     private InstanceAdapter instanceAdapter;
-    private final java.util.List<java.io.File> instanceList = new ArrayList<>();
-    private RecyclerView savedPathsRecycler;
+    private final java.util.List<InstanceAdapter.InstanceEntry> instanceList = new ArrayList<>();
     private ModDownloader downloader;
     private com.modbundle.app.utils.InstanceNameStore instanceNameStore;
     private PrefManager prefs;
@@ -109,7 +112,6 @@ public class MainActivity extends AppCompatActivity {
         setupInstalledRecycler();
         setupSettings();
         requestManageStoragePermission();
-        setupSavedPaths();
         setupInstances();
 
         showTab("browse");
@@ -119,7 +121,6 @@ public class MainActivity extends AppCompatActivity {
             showFolderPickerPrompt();
         } else {
             updateFolderLabel();
-            refreshSavedPaths();
         }
     }
 
@@ -156,7 +157,6 @@ public class MainActivity extends AppCompatActivity {
         btnTypeMods = findViewById(R.id.btn_type_mods);
         btnTypeResourcepack = findViewById(R.id.btn_type_resourcepack);
         btnTypeShader = findViewById(R.id.btn_type_shader);
-        btnLoadMore     = findViewById(R.id.btn_load_more);
         btnSnapshots    = findViewById(R.id.btn_snapshots);
         btnChooseFolder = findViewById(R.id.btn_choose_folder);
         installedTabMods = findViewById(R.id.installed_tab_mods);
@@ -238,7 +238,6 @@ public class MainActivity extends AppCompatActivity {
         spinnerVersion.setOnItemSelectedListener(filterListener);
         spinnerLoader.setOnItemSelectedListener(filterListener);
 
-        btnLoadMore.setOnClickListener(v -> searchMods(false));
         btnSnapshots.setOnCheckedChangeListener((b, checked) -> {
             includeSnapshots = checked;
             api.getGameVersions(includeSnapshots, versions -> {
@@ -279,36 +278,6 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void setupSavedPaths() {
-        refreshSavedPaths();
-    }
-
-    private void refreshSavedPaths() {
-        java.util.List<android.net.Uri> saved = prefs.getSavedPaths();
-        android.net.Uri active = prefs.getModsUri();
-        if (savedPathsRecycler == null && layoutInstances != null)
-            savedPathsRecycler = layoutInstances.findViewById(R.id.saved_paths_recycler);
-        if (savedPathsRecycler == null) return;
-        if (saved.isEmpty()) {
-            savedPathsRecycler.setVisibility(View.GONE);
-            return;
-        }
-        savedPathsRecycler.setVisibility(View.VISIBLE);
-        savedPathsRecycler.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this));
-        savedPathsRecycler.setAdapter(new SavedPathsAdapter(this, saved, active, new SavedPathsAdapter.Listener() {
-            @Override public void onUse(android.net.Uri uri) {
-                prefs.saveModsUri(uri);
-                updateFolderLabel();
-                refreshSavedPaths();
-                Toast.makeText(MainActivity.this, "Switched to saved path", Toast.LENGTH_SHORT).show();
-            }
-            @Override public void onRemove(android.net.Uri uri) {
-                prefs.removeSavedPath(uri);
-                updateFolderLabel();
-                refreshSavedPaths();
-            }
-        }));
-    }
 
     private void requestManageStoragePermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -321,19 +290,25 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupInstances() {
-        instanceAdapter = new InstanceAdapter(this, instanceList, (instanceFolder, name) -> {
-            android.net.Uri uri = android.net.Uri.fromFile(instanceFolder);
+        instanceAdapter = new InstanceAdapter(this, instanceList, (instanceEntry, name) -> {
+            android.net.Uri uri;
+            String path = instanceEntry.path;
+            if (path.startsWith("content://")) {
+                uri = android.net.Uri.parse(path);
+            } else {
+                uri = android.net.Uri.fromFile(new java.io.File(path));
+            }
             prefs.saveInstanceUri(uri);
             updateFolderLabel();
             updateActiveInstanceLabel();
-            instanceAdapter.setActiveInstancePath(instanceFolder.getAbsolutePath());
+            instanceAdapter.setActiveInstancePath(path);
             Toast.makeText(this, "Active: " + name, Toast.LENGTH_SHORT).show();
             // Stay on instances tab
         });
 
         // Wire rename/edit listener - name + loader + version
         instanceAdapter.setRenameListener((instance, currentName) -> {
-            String path = instance.getAbsolutePath();
+            String path = instance.path;
             android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
             layout.setOrientation(android.widget.LinearLayout.VERTICAL);
             layout.setPadding(48, 16, 48, 0);
@@ -378,23 +353,44 @@ public class MainActivity extends AppCompatActivity {
 
         // Wire logo picker listener
         instanceAdapter.setLogoListener((instance, path) -> {
-            String[] logoNames = {
-                "ic_launcher_monochrome", "ic_fabric", "ic_quilt",
-                "ic_pojav_full", "ic_curseforge", "ic_modrinth",
-                "ic_mg_renderer", "ic_menu_home", "ic_folder",
-                "ic_add_modded", "ic_menu_settings", "ic_file"
-            };
-            String[] labels = {
-                "Default", "Fabric", "Quilt",
-                "PojavLauncher", "CurseForge", "Modrinth",
-                "MG Renderer", "Home", "Folder",
-                "Modded", "Settings", "File"
-            };
+            String[] logoNames = {"ic_fabric", "ic_quilt", "ic_forge", "ic_neoforge", "gallery"};
+            String[] labels = {"Fabric", "Quilt", "Forge", "NeoForge", "Gallery"};
+
+            ArrayAdapter<String> logoAdapter = new ArrayAdapter<>(this, android.R.layout.select_dialog_item, labels);
+
             new AlertDialog.Builder(this)
                 .setTitle("Choose Logo")
-                .setItems(labels, (d, which) -> {
-                    instanceNameStore.setLogo(instance.getAbsolutePath(), logoNames[which]);
-                    instanceAdapter.notifyDataSetChanged();
+                .setAdapter(logoAdapter, (d, which) -> {
+                    if (logoNames[which].equals("gallery")) {
+                        pendingLogoInstancePath = instance.path;
+                        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                        intent.addCategory(Intent.CATEGORY_OPENABLE);
+                        intent.setType("image/*");
+                        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+                        startActivityForResult(intent, REQUEST_LOGO);
+                    } else {
+                        instanceNameStore.setLogo(path, logoNames[which]);
+                        instanceAdapter.notifyDataSetChanged();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+        });
+
+        instanceAdapter.setDeleteListener((instance, path) -> {
+            new AlertDialog.Builder(this)
+                .setTitle("Remove instance")
+                .setMessage("Remove this instance from the app? This will not delete the actual folder.")
+                .setPositiveButton("Remove", (d, w) -> {
+                    if (instance != null) {
+                        instanceList.remove(instance);
+                        if (path.equals(prefs.getInstanceUri() != null ? ("file".equals(prefs.getInstanceUri().getScheme()) ? prefs.getInstanceUri().getPath() : prefs.getInstanceUri().toString()) : "")) {
+                            prefs.saveInstanceUri(null);
+                            updateFolderLabel();
+                            updateActiveInstanceLabel();
+                        }
+                        instanceAdapter.notifyDataSetChanged();
+                    }
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
@@ -403,34 +399,70 @@ public class MainActivity extends AppCompatActivity {
         android.view.View instLayout = layoutInstances;
         if (instLayout != null) {
             instancesRecycler = instLayout.findViewById(R.id.instances_recycler);
-            savedPathsRecycler = null; // removed from instances tab
-            btnScanInstances = instLayout.findViewById(R.id.btn_scan_instances);
-            ImageButton btnChooseFromInst = instLayout.findViewById(R.id.btn_choose_folder);
             ImageButton btnAddInstance = instLayout.findViewById(R.id.btn_add_instance);
 
             if (instancesRecycler != null) {
                 instancesRecycler.setLayoutManager(new LinearLayoutManager(this));
+                instancesRecycler.setHasFixedSize(true);
+                instancesRecycler.setNestedScrollingEnabled(false);
                 instancesRecycler.setAdapter(instanceAdapter);
             }
-            if (btnScanInstances != null) btnScanInstances.setOnClickListener(v -> scanForInstances());
             if (btnAddInstance != null) btnAddInstance.setOnClickListener(v -> openFolderPicker());
-            // Add auto search path button
-            android.widget.ImageButton btnAddSearchPath = instLayout.findViewById(R.id.btn_add_search_path);
-            if (btnAddSearchPath != null) btnAddSearchPath.setOnClickListener(v -> {
-                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-                startActivityForResult(intent, 5001);
-            });
         }
 
-        // Set active path on adapter
+        // Set active path on adapter and restore saved instance to the list
         android.net.Uri activeUri = prefs.getInstanceUri();
-        if (activeUri != null && "file".equals(activeUri.getScheme())) {
-            instanceAdapter.setActiveInstancePath(activeUri.getPath());
-        }
-        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R) {
-            scanForInstances();
+        if (activeUri != null) {
+            addInstanceFromUri(activeUri);
+            Uri preferred = resolvePreferredInstanceUri(activeUri);
+            if (preferred != null) {
+                String activePath = "file".equals(preferred.getScheme()) ? preferred.getPath() : activeUri.toString();
+                instanceAdapter.setActiveInstancePath(activePath);
+            }
         }
         updateActiveInstanceLabel();
+    }
+
+    private void addInstanceIfNotPresent(InstanceAdapter.InstanceEntry instanceEntry) {
+        if (instanceEntry == null) return;
+        String path = instanceEntry.path;
+        boolean isContentUri = path.startsWith("content://");
+        if (!isContentUri) {
+            java.io.File instanceDir = new java.io.File(path);
+            if (!instanceDir.exists() || !instanceDir.isDirectory()) return;
+        }
+        for (InstanceAdapter.InstanceEntry entry : instanceList) {
+            if (entry.path.equals(path)) return;
+        }
+        instanceList.add(instanceEntry);
+        instanceAdapter.notifyDataSetChanged();
+    }
+
+    private Uri resolvePreferredInstanceUri(Uri uri) {
+        if (uri == null) return null;
+        if ("file".equals(uri.getScheme())) return uri;
+        if ("content".equals(uri.getScheme())) {
+            String realPath = getRealPathFromUri(uri);
+            if (realPath != null) {
+                java.io.File instanceDir = new java.io.File(realPath);
+                if (instanceDir.exists() && instanceDir.isDirectory()) {
+                    return Uri.fromFile(instanceDir);
+                }
+            }
+        }
+        return uri;
+    }
+
+    private void addInstanceFromUri(Uri uri) {
+        if (uri == null) return;
+        Uri preferred = resolvePreferredInstanceUri(uri);
+        if (preferred != null && "file".equals(preferred.getScheme())) {
+            addInstanceIfNotPresent(new InstanceAdapter.InstanceEntry(preferred.getPath(), false));
+            return;
+        }
+        if (uri.toString().startsWith("content://")) {
+            addInstanceIfNotPresent(new InstanceAdapter.InstanceEntry(uri.toString(), true));
+        }
     }
 
     private void updateActiveInstanceLabel() {
@@ -443,54 +475,19 @@ public class MainActivity extends AppCompatActivity {
         } else {
             String path = "file".equals(uri.getScheme()) ? uri.getPath() : uri.toString();
             String customName = instanceNameStore.getName(path);
-            String display = (customName != null && !customName.isEmpty()) ? customName : uri.getLastPathSegment();
+            String display = (customName != null && !customName.isEmpty()) ? customName : getUriDisplayName(uri);
             if (display == null) display = uri.toString();
             tvActive.setText("Active: " + display);
         }
     }
 
-    private void scanForInstances() {
-        instanceList.clear();
-        String ext = android.os.Environment.getExternalStorageDirectory().getAbsolutePath();
-        String[] basePaths = {
-            ext + "/games/PojavLauncher/custom_instances",
-            ext + "/games/CopperLauncher/custom_instances",
-            ext + "/games/Amethyst/custom_instances",
-            ext + "/games/PojavLauncher/instances",
-        };
-        for (String path : basePaths) {
-            java.io.File dir = new java.io.File(path);
-            if (dir.exists() && dir.isDirectory()) {
-                java.io.File[] instances = dir.listFiles();
-                if (instances != null) {
-                    for (java.io.File f : instances) {
-                        if (f.isDirectory()) instanceList.add(f);
-                    }
-                }
-            }
-        }
-        instanceAdapter.notifyDataSetChanged();
-        if (instanceList.isEmpty()) {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                new androidx.appcompat.app.AlertDialog.Builder(this)
-                    .setTitle("No instances found")
-                    .setMessage("On Android 11+, launcher files in Android/data/ can't be accessed automatically.\n\nTap 'Browse' to manually navigate to your launcher's custom_instances folder.")
-                    .setPositiveButton("Browse Android/data", (d, w) -> {
-                        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-                        intent.putExtra("android.provider.extra.INITIAL_URI",
-                            android.provider.DocumentsContract.buildDocumentUri(
-                                "com.android.externalstorage.documents", "primary:Android/data"));
-                        startActivityForResult(intent, REQUEST_FOLDER);
-                    })
-                    .setNegativeButton("Use Manual Picker", (d, w) -> btnChooseFolder.performClick())
-                    .show();
-            } else {
-                Toast.makeText(this, "No instances found. Choose folder manually.", Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
 
     private void setupSourceToggle() {
+        boolean curseForgeAvailable = com.modbundle.app.api.CurseForgeApi.isEnabled();
+        if (!curseForgeAvailable) {
+            btnCurseForge.setEnabled(false);
+            btnCurseForge.setAlpha(0.5f);
+        }
         btnModrinth.setOnClickListener(v -> {
             useCurseForge = false;
             btnModrinth.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF9649b8));
@@ -500,6 +497,10 @@ public class MainActivity extends AppCompatActivity {
             searchMods(true);
         });
         btnCurseForge.setOnClickListener(v -> {
+            if (!curseForgeAvailable) {
+                Toast.makeText(this, "CurseForge is currently unavailable", Toast.LENGTH_SHORT).show();
+                return;
+            }
             useCurseForge = true;
             btnCurseForge.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF9649b8));
             btnCurseForge.setTextColor(0xFFFFFFFF);
@@ -543,7 +544,23 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         browseRecycler.setLayoutManager(new LinearLayoutManager(this));
+        browseRecycler.setHasFixedSize(true);
+        browseRecycler.setNestedScrollingEnabled(false);
         browseRecycler.setAdapter(modAdapter);
+        browseRecycler.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+                super.onScrolled(recyclerView, dx, dy);
+                if (dy <= 0 || isLoading || !hasMoreResults) return;
+                LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
+                if (layoutManager == null) return;
+                int totalItemCount = layoutManager.getItemCount();
+                int lastVisibleItem = layoutManager.findLastVisibleItemPosition();
+                if (lastVisibleItem >= totalItemCount - 2) {
+                    searchMods(false);
+                }
+            }
+        });
     }
 
     private void setupInstalledRecycler() {
@@ -628,6 +645,8 @@ public class MainActivity extends AppCompatActivity {
             else installedAdapter.deselectAll();
         });
         installedRecycler.setLayoutManager(new LinearLayoutManager(this));
+        installedRecycler.setHasFixedSize(true);
+        installedRecycler.setNestedScrollingEnabled(false);
         installedRecycler.setAdapter(installedAdapter);
     }
 
@@ -650,15 +669,16 @@ public class MainActivity extends AppCompatActivity {
 
     private void searchMods(boolean reset) {
         if (isLoading) return;
+        if (!reset && !hasMoreResults) return;
         if (reset) {
             currentOffset = 0;
             modResults.clear();
             modAdapter.notifyDataSetChanged();
+            hasMoreResults = true;
         }
 
         isLoading = true;
         browseProgress.setVisibility(View.VISIBLE);
-        btnLoadMore.setVisibility(View.GONE);
         emptyBrowse.setVisibility(View.GONE);
 
         currentQuery = searchInput.getText().toString().trim();
@@ -672,13 +692,12 @@ public class MainActivity extends AppCompatActivity {
                     isLoading = false;
                     if (reset) { modAdapter.getMods().clear(); modAdapter.notifyDataSetChanged(); }
                     if (results.isEmpty()) {
+                        hasMoreResults = false;
                         if (modAdapter.getItemCount() == 0) emptyBrowse.setVisibility(android.view.View.VISIBLE);
-                        btnLoadMore.setVisibility(android.view.View.GONE);
                     } else {
                         emptyBrowse.setVisibility(android.view.View.GONE);
                         modAdapter.getMods().addAll(results); modAdapter.notifyDataSetChanged();
                         currentOffset += results.size();
-                        btnLoadMore.setVisibility(android.view.View.VISIBLE);
                     }
                 });
             }, error -> runOnUiThread(() -> {
@@ -700,8 +719,9 @@ public class MainActivity extends AppCompatActivity {
                         modResults.addAll(result.hits);
                         modAdapter.notifyDataSetChanged();
                         currentOffset += result.hits.size();
-                        btnLoadMore.setVisibility(
-                            currentOffset < result.totalHits ? View.VISIBLE : View.GONE);
+                        hasMoreResults = currentOffset < result.totalHits;
+                    } else {
+                        hasMoreResults = false;
                     }
                     emptyBrowse.setVisibility(modResults.isEmpty() ? View.VISIBLE : View.GONE);
                 });
@@ -728,10 +748,22 @@ public class MainActivity extends AppCompatActivity {
             curseForgeApi.getLatestFile(mod.projectId, version, loader, fileObj -> {
                 handler.post(() -> {
                     loading.dismiss();
+                    if (fileObj == null || !fileObj.has("id") || !fileObj.has("fileName")) {
+                        Toast.makeText(this, "No versions found", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
                     String fileId = fileObj.get("id").getAsString();
                     String fileName = fileObj.get("fileName").getAsString();
+                    if (fileId == null || fileId.isEmpty() || fileName == null || fileName.isEmpty()) {
+                        Toast.makeText(this, "No versions found", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
                     curseForgeApi.getDownloadUrl(mod.projectId, fileId, url -> {
                         handler.post(() -> {
+                            if (url == null || url.isEmpty()) {
+                                Toast.makeText(this, "Unable to download file", Toast.LENGTH_SHORT).show();
+                                return;
+                            }
                             new AlertDialog.Builder(this)
                                 .setTitle("Install: " + mod.title)
                                 .setMessage(fileName)
@@ -742,7 +774,7 @@ public class MainActivity extends AppCompatActivity {
                                     ModVersion fakeVersion = new ModVersion();
                                     fakeVersion.versionNumber = fileName;
                                     fakeVersion.dependencies = new java.util.ArrayList<>();
-                                    startDownload(mod, fakeVersion, file);
+                                    showDependencySelectionDialog(mod, fakeVersion, file);
                                 })
                                 .setNegativeButton("Cancel", null)
                                 .show();
@@ -774,7 +806,7 @@ public class MainActivity extends AppCompatActivity {
                     .setItems(labels, (d, which) -> {
                         ModVersion selected = versions.get(which);
                         ModVersion.VersionFile file = ModDownloader.getPrimaryFile(selected);
-                        if (file != null) startDownload(mod, selected, file);
+                        if (file != null) showDependencySelectionDialog(mod, selected, file);
                     })
                     .setNegativeButton("Cancel", null).show();
             });
@@ -782,6 +814,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startDownload(ModResult mod, ModVersion version, ModVersion.VersionFile file) {
+        startDownload(mod, version, file, version.dependencies);
+    }
+
+    private void startDownload(ModResult mod, ModVersion version, ModVersion.VersionFile file, List<ModVersion.Dependency> dependencies) {
         ProgressDialog progress = new ProgressDialog(this);
         progress.setTitle("Installing " + mod.title);
         progress.setMessage("Downloading…");
@@ -808,14 +844,64 @@ public class MainActivity extends AppCompatActivity {
         };
 
         String subFolder = "resourcepack".equals(currentProjectType) ? "resourcepacks" : "shader".equals(currentProjectType) ? "shaderpacks" : "mods";
+        String dependencyGameVersion = getSelectedVersion();
+        String dependencyLoader = getSelectedLoader();
+        if (version.gameVersions != null && !version.gameVersions.isEmpty()) {
+            dependencyGameVersion = version.gameVersions.get(0);
+        }
+        if (version.loaders != null && !version.loaders.isEmpty()) {
+            dependencyLoader = version.loaders.get(0);
+        }
         Uri instanceUri = prefs.getInstanceUri();
         if (instanceUri != null && "content".equals(instanceUri.getScheme())) {
-            downloader.downloadMod(file, instanceUri, subFolder, version.dependencies, getSelectedVersion(), getSelectedLoader(), callback);
+            downloader.downloadMod(file, instanceUri, subFolder, dependencies, dependencyGameVersion, dependencyLoader, callback);
         } else {
             java.io.File targetDir = getTargetDirLegacy();
             if (targetDir == null) { progress.dismiss(); showFolderPickerPrompt(); return; }
-            downloader.downloadMod(file, targetDir, version.dependencies, getSelectedVersion(), getSelectedLoader(), callback);
+            downloader.downloadMod(file, targetDir, dependencies, dependencyGameVersion, dependencyLoader, callback);
         }
+    }
+
+    private void showDependencySelectionDialog(ModResult mod, ModVersion version, ModVersion.VersionFile file) {
+        if (version.dependencies == null || version.dependencies.isEmpty()) {
+            startDownload(mod, version, file);
+            return;
+        }
+
+        java.util.List<ModVersion.Dependency> deps = new java.util.ArrayList<>();
+        java.util.List<String> labels = new java.util.ArrayList<>();
+        java.util.List<Boolean> checked = new java.util.ArrayList<>();
+        for (ModVersion.Dependency dep : version.dependencies) {
+            if (dep == null || dep.projectId == null) continue;
+            deps.add(dep);
+            String type = dep.dependencyType != null ? dep.dependencyType : "required";
+            labels.add(("required".equals(type) ? "Required: " : "Optional: ") + dep.projectId);
+            checked.add("required".equals(type));
+        }
+
+        if (deps.isEmpty()) {
+            startDownload(mod, version, file);
+            return;
+        }
+
+        CharSequence[] items = labels.toArray(new CharSequence[0]);
+        boolean[] initialChecked = new boolean[checked.size()];
+        for (int i = 0; i < checked.size(); i++) initialChecked[i] = checked.get(i);
+
+        new AlertDialog.Builder(this)
+            .setTitle("Install dependencies")
+            .setMessage("Select which dependencies to install with this mod.")
+            .setMultiChoiceItems(items, initialChecked, (dialog, which, isChecked) -> initialChecked[which] = isChecked)
+            .setPositiveButton("Install selected", (d, w) -> {
+                List<ModVersion.Dependency> selectedDeps = new ArrayList<>();
+                for (int i = 0; i < deps.size(); i++) {
+                    if (initialChecked[i]) selectedDeps.add(deps.get(i));
+                }
+                startDownload(mod, version, file, selectedDeps);
+            })
+            .setNeutralButton("Install without deps", (d, w) -> startDownload(mod, version, file, new ArrayList<>()))
+            .setNegativeButton("Cancel", null)
+            .show();
     }
 
     private void checkUpdates() {
@@ -826,6 +912,10 @@ public class MainActivity extends AppCompatActivity {
         installedAdapter.notifyDataSetChanged();
 
         java.util.List<Object> modsCopy = new java.util.ArrayList<>(installedMods);
+        if (modsCopy.isEmpty()) {
+            finishCheckUpdates(0);
+            return;
+        }
         java.util.concurrent.atomic.AtomicInteger pending = new java.util.concurrent.atomic.AtomicInteger(modsCopy.size());
         java.util.concurrent.atomic.AtomicInteger updatesFound = new java.util.concurrent.atomic.AtomicInteger(0);
 
@@ -979,6 +1069,31 @@ public class MainActivity extends AppCompatActivity {
         return null;
     }
 
+    private String getRealPathFromUri(Uri uri) {
+        try {
+            String docId = android.provider.DocumentsContract.getTreeDocumentId(uri);
+            if (docId == null) return null;
+            docId = java.net.URLDecoder.decode(docId, "UTF-8");
+            if (docId.startsWith("raw:")) {
+                return docId.substring(4);
+            }
+            String[] split = docId.split(":", 2);
+            if (split.length == 0) return null;
+            String volume = split[0];
+            String pathPart = split.length > 1 ? split[1] : "";
+            if (volume.isEmpty()) return null;
+            if ("primary".equalsIgnoreCase(volume)) {
+                if (pathPart.isEmpty()) return android.os.Environment.getExternalStorageDirectory().getAbsolutePath();
+                return android.os.Environment.getExternalStorageDirectory().getAbsolutePath() + "/" + pathPart;
+            }
+            if (pathPart.isEmpty()) {
+                return "/storage/" + volume;
+            }
+            return "/storage/" + volume + "/" + pathPart;
+        } catch (Exception e) {}
+        return null;
+    }
+
     private java.io.File getTargetDirLegacy() {
         java.io.File instanceDir = getLegacyInstanceDir();
         if (instanceDir == null) return null;
@@ -988,50 +1103,88 @@ public class MainActivity extends AppCompatActivity {
         return target;
     }
 
-    private String getRealPathFromUri(Uri uri) {
-        try {
-            String docId = android.provider.DocumentsContract.getTreeDocumentId(uri);
-            docId = java.net.URLDecoder.decode(docId, "UTF-8");
-            String[] split = docId.split(":");
-            if (split.length >= 2 && "primary".equalsIgnoreCase(split[0])) {
-                return android.os.Environment.getExternalStorageDirectory() + "/" + split[1];
-            }
-        } catch (Exception e) {}
-        return null;
-    }
-
     private void openFolderPicker() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         startActivityForResult(intent, REQUEST_FOLDER);
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == 5001 && resultCode == RESULT_OK && data != null) {
-            android.net.Uri uri = data.getData();
-            getContentResolver().takePersistableUriPermission(uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-            prefs.addSavedPath(uri);
-            scanForInstances();
-            Toast.makeText(this, "Search path added!", Toast.LENGTH_SHORT).show();
-            return;
-        }
         if (requestCode == REQUEST_FOLDER && resultCode == RESULT_OK && data != null) {
             Uri uri = data.getData();
+            if (uri == null) return;
             getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+
+            Uri preferred = resolvePreferredInstanceUri(uri);
+            if (preferred != null && "file".equals(preferred.getScheme())) {
+                java.io.File instanceDir = new java.io.File(preferred.getPath());
+                if (instanceDir.exists() && instanceDir.isDirectory()) {
+                    prefs.saveInstanceUri(preferred);
+                    addInstanceIfNotPresent(new InstanceAdapter.InstanceEntry(instanceDir.getAbsolutePath(), false));
+                    instanceAdapter.setActiveInstancePath(instanceDir.getAbsolutePath());
+                    updateFolderLabel();
+                    updateActiveInstanceLabel();
+                    searchMods(true);
+                    return;
+                }
+            }
+
+            // Fallback to SAF if file path cannot be resolved
             String realPath = getRealPathFromUri(uri);
-            Uri uriToSave = (realPath != null) ? Uri.fromFile(new java.io.File(realPath)) : uri;
-            prefs.saveInstanceUri(uriToSave);
+            if (realPath != null) {
+                java.io.File instanceDir = new java.io.File(realPath);
+                if (instanceDir.exists() && instanceDir.isDirectory()) {
+                    prefs.saveInstanceUri(uri);
+                    addInstanceIfNotPresent(new InstanceAdapter.InstanceEntry(instanceDir.getAbsolutePath(), false));
+                    instanceAdapter.setActiveInstancePath(instanceDir.getAbsolutePath());
+                    updateFolderLabel();
+                    updateActiveInstanceLabel();
+                    searchMods(true);
+                    return;
+                }
+            }
+            prefs.saveInstanceUri(uri);
+            addInstanceIfNotPresent(new InstanceAdapter.InstanceEntry(uri.toString(), true));
+            instanceAdapter.setActiveInstancePath(uri.toString());
             updateFolderLabel();
-            refreshSavedPaths();
+            updateActiveInstanceLabel();
             searchMods(true);
+            return;
+        }
+
+        if (requestCode == REQUEST_LOGO && resultCode == RESULT_OK && data != null) {
+            Uri uri = data.getData();
+            if (uri == null || pendingLogoInstancePath == null) return;
+            getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            instanceNameStore.setLogo(pendingLogoInstancePath, uri.toString());
+            instanceAdapter.notifyDataSetChanged();
+            pendingLogoInstancePath = null;
         }
     }
 
     private void updateFolderLabel() {
         Uri uri = prefs.getInstanceUri();
-        if (tvFolderPath != null) tvFolderPath.setText(uri != null ? uri.getLastPathSegment() : "No folder selected");
+        if (tvFolderPath == null) return;
+        if (uri == null) {
+            tvFolderPath.setText("No folder selected");
+            return;
+        }
+        String label = uri.getLastPathSegment();
+        if (label == null || label.isEmpty()) {
+            label = getUriDisplayName(uri);
+        }
+        tvFolderPath.setText(label != null ? label : uri.toString());
+    }
+
+    private String getUriDisplayName(Uri uri) {
+        if (uri == null) return null;
+        try {
+            androidx.documentfile.provider.DocumentFile file = androidx.documentfile.provider.DocumentFile.fromTreeUri(this, uri);
+            if (file != null && file.getName() != null) return file.getName();
+        } catch (Exception ignored) {}
+        return uri.getLastPathSegment();
     }
 
     private void showFolderPickerPrompt() {
@@ -1043,6 +1196,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void saveFilters() { prefs.saveFilters(getSelectedVersion(), getSelectedLoader()); }
-    private String getSelectedVersion() { String v = (String) spinnerVersion.getSelectedItem(); return "Any".equals(v) ? "" : v; }
-    private String getSelectedLoader() { String l = (String) spinnerLoader.getSelectedItem(); return "Any".equals(l) ? "" : l; }
+    private String getSelectedVersion() {
+        String v = spinnerVersion.getSelectedItem() != null ? ((String) spinnerVersion.getSelectedItem()).trim() : "";
+        return "Any".equalsIgnoreCase(v) ? "" : v;
+    }
+    private String getSelectedLoader() {
+        String l = spinnerLoader.getSelectedItem() != null ? ((String) spinnerLoader.getSelectedItem()).trim() : "";
+        return "Any".equalsIgnoreCase(l) ? "" : l.toLowerCase();
+    }
 }

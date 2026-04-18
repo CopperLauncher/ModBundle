@@ -38,16 +38,17 @@ public class ModrinthApi {
                            int offset, String projectType, Callback<SearchResponse> callback) {
         new Thread(() -> {
             try {
-                String type = (projectType == null || projectType.isEmpty()) ? "mod" : projectType;
-                StringBuilder facets = new StringBuilder("[[\"project_type:" + type + "\"]");
-                if (gameVersion != null && !gameVersion.isEmpty() && !gameVersion.equals("Any"))
-                    facets.append(",[\"versions:").append(gameVersion).append("\"]");
-                if (loader != null && !loader.isEmpty() && !loader.equals("Any"))
-                    facets.append(",[\"categories:").append(loader).append("\"]");
+                String type = (projectType == null || projectType.isEmpty()) ? "mod" : projectType;                String version = gameVersion != null ? gameVersion.trim() : "";
+                String loaderValue = loader != null ? loader.trim() : "";                StringBuilder facets = new StringBuilder("[[\"project_type:" + type + "\"]");
+                if (!version.isEmpty() && !version.equalsIgnoreCase("Any"))
+                    facets.append(",[\"versions:").append(version).append("\"]");
+                if (!loaderValue.isEmpty() && !loaderValue.equalsIgnoreCase("Any"))
+                    facets.append(",[\"loaders:").append(loaderValue).append("\"]");
                 facets.append("]");
                 StringBuilder url = new StringBuilder(BASE + "/search");
-                url.append("?facets=").append(facets);
-                url.append("&query=").append(query == null || query.isEmpty() ? "" : encode(query));
+                url.append("?facets=").append(encode(facets.toString()));
+                String q = query != null ? query.trim() : "";
+                url.append("&query=").append(encode(q));
                 url.append("&limit=20&offset=").append(offset);
                 Request request = new Request.Builder()
                         .url(url.toString())
@@ -109,6 +110,23 @@ public class ModrinthApi {
                 }
             } catch (IOException e) {
                 callback.onError("Network error: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    public void getVersion(String versionId, OnSuccess<ModVersion> onSuccess, OnError onError) {
+        new Thread(() -> {
+            try {
+                Request request = new Request.Builder()
+                        .url(BASE + "/version/" + versionId)
+                        .header("User-Agent", USER_AGENT)
+                        .build();
+                try (Response response = client.newCall(request).execute()) {
+                    if (!response.isSuccessful()) { onError.onError("Server error: " + response.code()); return; }
+                    onSuccess.onSuccess(gson.fromJson(response.body().string(), ModVersion.class));
+                }
+            } catch (IOException e) {
+                onError.onError("Network error: " + e.getMessage());
             }
         }).start();
     }
