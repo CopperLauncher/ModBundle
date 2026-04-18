@@ -305,6 +305,8 @@ public class ModDetailActivity extends AppCompatActivity {
                 .show();
         });
 
+    }
+
     private void startDownload(ModVersion version, ModVersion.VersionFile file, java.util.List<ModVersion.Dependency> dependencies) {
         String subFolder = "resourcepack".equals(projectType) ? "resourcepacks"
                          : "shader".equals(projectType) ? "shaderpacks" : "mods";
