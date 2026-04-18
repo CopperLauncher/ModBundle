@@ -268,8 +268,7 @@ public class ModDetailActivity extends AppCompatActivity {
         for (int i = 0; i < checked.size(); i++) selected[i] = checked.get(i);
 
         new AlertDialog.Builder(this)
-            .setTitle("Install dependencies")
-            .setMessage("Select which dependencies to install with this mod.")
+            .setTitle("Select dependencies to install")
             .setMultiChoiceItems(items, selected, (dialog, which, isChecked) -> selected[which] = isChecked)
             .setPositiveButton("Install selected", (d, w) -> {
                 java.util.List<ModVersion.Dependency> selectedDeps = new java.util.ArrayList<>();
