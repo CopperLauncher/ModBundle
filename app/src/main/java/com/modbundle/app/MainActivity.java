@@ -311,7 +311,7 @@ public class MainActivity extends AppCompatActivity {
             String path = instance.path;
             android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
             layout.setOrientation(android.widget.LinearLayout.VERTICAL);
-            layout.setPadding(48, 16, 48, 0);
+            layout.setPadding(48, 16, 48, 8);
 
             // Name
             android.widget.EditText etName = new android.widget.EditText(this);
@@ -326,17 +326,16 @@ public class MainActivity extends AppCompatActivity {
             tvLoader.setText("Loader");
             tvLoader.setTextColor(0xFF888888);
             tvLoader.setTextSize(12f);
-            tvLoader.setPadding(0, 16, 0, 4);
+            tvLoader.setPadding(0, 20, 0, 4);
             layout.addView(tvLoader);
             android.widget.Spinner spLoader = new android.widget.Spinner(this);
-            String[] loaderOptions = LOADERS;
             android.widget.ArrayAdapter<String> lAd = new android.widget.ArrayAdapter<>(
-                this, android.R.layout.simple_spinner_item, loaderOptions);
+                this, android.R.layout.simple_spinner_item, LOADERS);
             lAd.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
             spLoader.setAdapter(lAd);
-            String savedLoaderInst = instanceNameStore.getLoader(path);
-            for (int i = 0; i < loaderOptions.length; i++) {
-                if (loaderOptions[i].equalsIgnoreCase(savedLoaderInst)) { spLoader.setSelection(i); break; }
+            String savedL = instanceNameStore.getLoader(path);
+            for (int i = 0; i < LOADERS.length; i++) {
+                if (LOADERS[i].equalsIgnoreCase(savedL)) { spLoader.setSelection(i); break; }
             }
             layout.addView(spLoader);
 
@@ -345,18 +344,51 @@ public class MainActivity extends AppCompatActivity {
             tvVer.setText("Minecraft Version");
             tvVer.setTextColor(0xFF888888);
             tvVer.setTextSize(12f);
-            tvVer.setPadding(0, 16, 0, 4);
+            tvVer.setPadding(0, 20, 0, 4);
             layout.addView(tvVer);
+
+            // Include snapshots checkbox
+            android.widget.CheckBox cbSnap = new android.widget.CheckBox(this);
+            cbSnap.setText("Include Snapshots");
+            cbSnap.setTextColor(0xFFAAAAAA);
+            cbSnap.setButtonTint(android.content.res.ColorStateList.valueOf(0xFF9649b8));
+            cbSnap.setChecked(false);
+            layout.addView(cbSnap);
+
             android.widget.Spinner spVersion = new android.widget.Spinner(this);
-            android.widget.SpinnerAdapter browseVer = spinnerVersion.getAdapter();
-            if (browseVer != null) {
-                spVersion.setAdapter(browseVer);
-                String savedVerInst = instanceNameStore.getVersion(path);
-                for (int i = 0; i < browseVer.getCount(); i++) {
-                    if (savedVerInst.equals(browseVer.getItem(i))) { spVersion.setSelection(i); break; }
-                }
-            }
             layout.addView(spVersion);
+
+            // Load versions using current snapshots pref
+            final boolean[] snapState = {false};
+            java.util.List<String> verList = new java.util.ArrayList<>();
+            verList.add("Any");
+            android.widget.ArrayAdapter<String> verAd = new android.widget.ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, verList);
+            verAd.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            spVersion.setAdapter(verAd);
+
+            // Helper to reload versions
+            final Runnable[] loadVersions = {null};
+            loadVersions[0] = () -> {
+                api.getGameVersions(snapState[0], versions -> {
+                    handler.post(() -> {
+                        verList.clear();
+                        verList.add("Any");
+                        verList.addAll(versions.subList(Math.min(1, versions.size()), versions.size()));
+                        verAd.notifyDataSetChanged();
+                        String savedV = instanceNameStore.getVersion(path);
+                        for (int i = 0; i < verList.size(); i++) {
+                            if (savedV.equals(verList.get(i))) { spVersion.setSelection(i); break; }
+                        }
+                    });
+                }, err -> {});
+            };
+            loadVersions[0].run();
+
+            cbSnap.setOnCheckedChangeListener((btn, isChecked) -> {
+                snapState[0] = isChecked;
+                loadVersions[0].run();
+            });
 
             new AlertDialog.Builder(this)
                 .setTitle("Edit Instance")
@@ -364,8 +396,8 @@ public class MainActivity extends AppCompatActivity {
                 .setPositiveButton("Save", (d, w) -> {
                     String newName = etName.getText().toString().trim();
                     String newLoader = spLoader.getSelectedItem().toString();
-                    Object selVer = spVersion.getSelectedItem();
-                    String newVersion = selVer != null ? selVer.toString() : "";
+                    Object selV = spVersion.getSelectedItem();
+                    String newVersion = selV != null ? selV.toString() : "";
                     if ("Any".equals(newLoader)) newLoader = "";
                     if ("Any".equals(newVersion)) newVersion = "";
                     if (!newName.isEmpty()) instanceNameStore.setName(path, newName);
@@ -871,12 +903,23 @@ public class MainActivity extends AppCompatActivity {
         };
 
         String subFolder = "resourcepack".equals(currentProjectType) ? "resourcepacks" : "shader".equals(currentProjectType) ? "shaderpacks" : "mods";
-        String dependencyGameVersion = getSelectedVersion();
-        String dependencyLoader = getSelectedLoader();
-        if (version.gameVersions != null && !version.gameVersions.isEmpty()) {
+        // Use instance-stored loader/version for dependency downloads
+        String depVersion = "", depLoader = "";
+        Uri depUri = prefs.getInstanceUri();
+        if (depUri != null) {
+            String depPath = "file".equals(depUri.getScheme()) ? depUri.getPath() : depUri.toString();
+            if (depPath != null) {
+                depLoader = instanceNameStore.getLoader(depPath);
+                depVersion = instanceNameStore.getVersion(depPath);
+            }
+        }
+        String dependencyGameVersion = depVersion.isEmpty() ? getSelectedVersion() : depVersion;
+        String dependencyLoader = depLoader.isEmpty() ? getSelectedLoader() : depLoader;
+        // Override with actual mod's version/loader if more specific
+        if (version.gameVersions != null && !version.gameVersions.isEmpty() && !version.gameVersions.get(0).isEmpty()) {
             dependencyGameVersion = version.gameVersions.get(0);
         }
-        if (version.loaders != null && !version.loaders.isEmpty()) {
+        if (version.loaders != null && !version.loaders.isEmpty() && !version.loaders.get(0).isEmpty()) {
             dependencyLoader = version.loaders.get(0);
         }
         Uri instanceUri = prefs.getInstanceUri();
@@ -896,65 +939,37 @@ public class MainActivity extends AppCompatActivity {
         }
 
         java.util.List<ModVersion.Dependency> deps = new java.util.ArrayList<>();
+        java.util.List<String> labels = new java.util.ArrayList<>();
+        java.util.List<Boolean> checked = new java.util.ArrayList<>();
         for (ModVersion.Dependency dep : version.dependencies) {
-            if (dep != null && dep.projectId != null) deps.add(dep);
+            if (dep == null || dep.projectId == null) continue;
+            deps.add(dep);
+            String type = dep.dependencyType != null ? dep.dependencyType : "required";
+            labels.add(("required".equals(type) ? "Required: " : "Optional: ") + dep.projectId);
+            checked.add("required".equals(type));
         }
-        if (deps.isEmpty()) { startDownload(mod, version, file); return; }
 
-        // Show loading dialog while resolving names
-        android.app.ProgressDialog loading = new android.app.ProgressDialog(this);
-        loading.setMessage("Loading dependencies...");
-        loading.setCancelable(false);
-        loading.show();
-
-        // Resolve all project names in parallel
-        java.util.List<String> resolvedNames = new java.util.ArrayList<>();
-        for (int i = 0; i < deps.size(); i++) resolvedNames.add(null);
-        java.util.concurrent.atomic.AtomicInteger pending = new java.util.concurrent.atomic.AtomicInteger(deps.size());
-
-        for (int i = 0; i < deps.size(); i++) {
-            final int idx = i;
-            final ModVersion.Dependency dep = deps.get(idx);
-            api.getProject(dep.projectId, new com.modbundle.app.api.ModrinthApi.Callback<ModResult>() {
-                public void onSuccess(ModResult result) {
-                    resolvedNames.set(idx, result.title != null ? result.title : dep.projectId);
-                    if (pending.decrementAndGet() == 0) handler.post(() -> {
-                        loading.dismiss();
-                        showDepDialog(deps, resolvedNames, mod, version, file);
-                    });
-                }
-                public void onError(String e) {
-                    resolvedNames.set(idx, dep.projectId);
-                    if (pending.decrementAndGet() == 0) handler.post(() -> {
-                        loading.dismiss();
-                        showDepDialog(deps, resolvedNames, mod, version, file);
-                    });
-                }
-            });
+        if (deps.isEmpty()) {
+            startDownload(mod, version, file);
+            return;
         }
-    }
 
-    private void showDepDialog(java.util.List<ModVersion.Dependency> deps,
-                               java.util.List<String> names,
-                               ModResult mod, ModVersion version, ModVersion.VersionFile file) {
-        CharSequence[] items = new CharSequence[deps.size()];
-        boolean[] checked = new boolean[deps.size()];
-        for (int i = 0; i < deps.size(); i++) {
-            String type = deps.get(i).dependencyType != null ? deps.get(i).dependencyType : "required";
-            String prefix = "required".equals(type) ? "✓ Required  " : "○ Optional  ";
-            items[i] = prefix + names.get(i);
-            checked[i] = "required".equals(type);
-        }
+        CharSequence[] items = labels.toArray(new CharSequence[0]);
+        boolean[] initialChecked = new boolean[checked.size()];
+        for (int i = 0; i < checked.size(); i++) initialChecked[i] = checked.get(i);
 
         new AlertDialog.Builder(this)
-            .setTitle("Install with " + mod.title + "?")
-            .setMultiChoiceItems(items, checked, (dialog, which, isChecked) -> checked[which] = isChecked)
-            .setPositiveButton("Install", (d, w) -> {
-                java.util.List<ModVersion.Dependency> selected = new java.util.ArrayList<>();
-                for (int i = 0; i < deps.size(); i++) { if (checked[i]) selected.add(deps.get(i)); }
-                startDownload(mod, version, file, selected);
+            .setTitle("Install dependencies")
+            .setMessage("Select which dependencies to install with this mod.")
+            .setMultiChoiceItems(items, initialChecked, (dialog, which, isChecked) -> initialChecked[which] = isChecked)
+            .setPositiveButton("Install selected", (d, w) -> {
+                List<ModVersion.Dependency> selectedDeps = new ArrayList<>();
+                for (int i = 0; i < deps.size(); i++) {
+                    if (initialChecked[i]) selectedDeps.add(deps.get(i));
+                }
+                startDownload(mod, version, file, selectedDeps);
             })
-            .setNeutralButton("Skip deps", (d, w) -> startDownload(mod, version, file, new java.util.ArrayList<>()))
+            .setNeutralButton("Install without deps", (d, w) -> startDownload(mod, version, file, new ArrayList<>()))
             .setNegativeButton("Cancel", null)
             .show();
     }
@@ -1069,11 +1084,24 @@ public class MainActivity extends AppCompatActivity {
             }
             public void onError(String error) { handler.post(() -> { progress.dismiss(); Toast.makeText(MainActivity.this, "Update failed", Toast.LENGTH_SHORT).show(); }); }
         };
+        // Get instance loader/version for correct update download
+        String upLoader = "", upVersion = "";
         Uri instanceUri = prefs.getInstanceUri();
-        if (instanceUri != null && "content".equals(instanceUri.getScheme())) downloader.downloadMod(file, instanceUri, "mods", null, "", "", callback);
-        else {
+        if (instanceUri != null) {
+            String ipath = "file".equals(instanceUri.getScheme()) ? instanceUri.getPath() : instanceUri.toString();
+            if (ipath != null) {
+                upLoader = instanceNameStore.getLoader(ipath);
+                upVersion = instanceNameStore.getVersion(ipath);
+            }
+        }
+        final String finalUpLoader = upLoader.isEmpty() ? getSelectedLoader() : upLoader;
+        final String finalUpVersion = upVersion.isEmpty() ? getSelectedVersion() : upVersion;
+
+        if (instanceUri != null && "content".equals(instanceUri.getScheme())) {
+            downloader.downloadMod(file, instanceUri, "mods", null, finalUpVersion, finalUpLoader, callback);
+        } else {
             java.io.File instanceDir = getLegacyInstanceDir();
-            if (instanceDir != null) downloader.downloadMod(file, new java.io.File(instanceDir, "mods"), null, "", "", callback);
+            if (instanceDir != null) downloader.downloadMod(file, new java.io.File(instanceDir, "mods"), null, finalUpVersion, finalUpLoader, callback);
         }
     }
 
