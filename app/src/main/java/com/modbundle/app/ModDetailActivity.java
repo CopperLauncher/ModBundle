@@ -250,10 +250,11 @@ public class ModDetailActivity extends AppCompatActivity {
         java.util.List<String> labels = new java.util.ArrayList<>();
         java.util.List<Boolean> checked = new java.util.ArrayList<>();
         for (ModVersion.Dependency dep : version.dependencies) {
-            if (dep == null || dep.projectId == null) continue;
+            if (dep == null || (dep.projectId == null && dep.versionId == null)) continue;
             deps.add(dep);
             String type = dep.dependencyType != null ? dep.dependencyType : "required";
-            labels.add(("required".equals(type) ? "Required: " : "Optional: ") + dep.projectId);
+            String id = dep.projectId != null ? dep.projectId : dep.versionId;
+            labels.add(("required".equals(type) ? "Required: " : "Optional: ") + id);
             checked.add("required".equals(type));
         }
 
