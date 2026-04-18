@@ -1007,9 +1007,10 @@ public class MainActivity extends AppCompatActivity {
                     // Use instance stored loader/version, fallback to spinner, then mod metadata
                     String iMcVer = "", iLoader = "";
                     android.net.Uri iUri = prefs.getInstanceUri();
-                    if (iUri != null && "file".equals(iUri.getScheme()) && iUri.getPath() != null) {
-                        iLoader = instanceNameStore.getLoader(iUri.getPath());
-                        iMcVer = instanceNameStore.getVersion(iUri.getPath());
+                    if (iUri != null) {
+                        String ipath = "file".equals(iUri.getScheme()) ? iUri.getPath() : iUri.toString();
+                        if (ipath != null) { iLoader = instanceNameStore.getLoader(ipath);
+                        iMcVer = instanceNameStore.getVersion(ipath); }
                     }
                     if (iMcVer.isEmpty()) iMcVer = getSelectedVersion();
                     if (iLoader.isEmpty()) iLoader = getSelectedLoader();
