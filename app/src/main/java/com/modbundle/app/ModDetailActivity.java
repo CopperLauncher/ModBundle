@@ -247,40 +247,63 @@ public class ModDetailActivity extends AppCompatActivity {
         }
 
         java.util.List<ModVersion.Dependency> deps = new java.util.ArrayList<>();
-        java.util.List<String> labels = new java.util.ArrayList<>();
-        java.util.List<Boolean> checked = new java.util.ArrayList<>();
         for (ModVersion.Dependency dep : version.dependencies) {
-            if (dep == null || dep.projectId == null) continue;
-            deps.add(dep);
-            String type = dep.dependencyType != null ? dep.dependencyType : "required";
-            labels.add(("required".equals(type) ? "Required: " : "Optional: ") + dep.projectId);
-            checked.add("required".equals(type));
+            if (dep != null && dep.projectId != null) deps.add(dep);
         }
+        if (deps.isEmpty()) { startDownload(version, file, new java.util.ArrayList<>()); return; }
 
-        if (deps.isEmpty()) {
-            startDownload(version, file, version.dependencies);
-            return;
-        }
+        android.app.ProgressDialog loading = new android.app.ProgressDialog(this);
+        loading.setMessage("Loading dependencies...");
+        loading.setCancelable(false);
+        loading.show();
 
-        CharSequence[] items = labels.toArray(new CharSequence[0]);
-        boolean[] selected = new boolean[checked.size()];
-        for (int i = 0; i < checked.size(); i++) selected[i] = checked.get(i);
+        java.util.List<String> resolvedNames = new java.util.ArrayList<>();
+        for (int i = 0; i < deps.size(); i++) resolvedNames.add(null);
+        java.util.concurrent.atomic.AtomicInteger pending2 = new java.util.concurrent.atomic.AtomicInteger(deps.size());
+        final ModVersion fVersion = version;
+        final ModVersion.VersionFile fFile = file;
 
-        new AlertDialog.Builder(this)
-            .setTitle("Install dependencies")
-            .setMessage("Select which dependencies to install with this mod.")
-            .setMultiChoiceItems(items, selected, (dialog, which, isChecked) -> selected[which] = isChecked)
-            .setPositiveButton("Install selected", (d, w) -> {
-                java.util.List<ModVersion.Dependency> selectedDeps = new java.util.ArrayList<>();
-                for (int i = 0; i < deps.size(); i++) {
-                    if (selected[i]) selectedDeps.add(deps.get(i));
+        for (int i = 0; i < deps.size(); i++) {
+            final int idx = i;
+            final ModVersion.Dependency dep = deps.get(idx);
+            api.getProject(dep.projectId, new com.modbundle.app.api.ModrinthApi.Callback<com.modbundle.app.model.ModResult>() {
+                public void onSuccess(com.modbundle.app.model.ModResult result) {
+                    resolvedNames.set(idx, result.title != null ? result.title : dep.projectId);
+                    checkAndShowDepDialog(pending2, deps, resolvedNames, fVersion, fFile, loading);
                 }
-                startDownload(version, file, selectedDeps);
-            })
-            .setNeutralButton("Install without deps", (d, w) -> startDownload(version, file, new java.util.ArrayList<>()))
-            .setNegativeButton("Cancel", null)
-            .show();
+                public void onError(String e) {
+                    resolvedNames.set(idx, dep.projectId);
+                    checkAndShowDepDialog(pending2, deps, resolvedNames, fVersion, fFile, loading);
+                }
+            });
+        }
     }
+
+    private void checkAndShowDepDialog(java.util.concurrent.atomic.AtomicInteger pending,
+            java.util.List<ModVersion.Dependency> deps, java.util.List<String> names,
+            ModVersion version, ModVersion.VersionFile file, android.app.ProgressDialog loading) {
+        if (pending.decrementAndGet() != 0) return;
+        handler.post(() -> {
+            loading.dismiss();
+            CharSequence[] items = new CharSequence[deps.size()];
+            boolean[] checked = new boolean[deps.size()];
+            for (int i = 0; i < deps.size(); i++) {
+                String type = deps.get(i).dependencyType != null ? deps.get(i).dependencyType : "required";
+                items[i] = ("required".equals(type) ? "✓ Required  " : "○ Optional  ") + names.get(i);
+                checked[i] = "required".equals(type);
+            }
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Install with " + mod.title + "?")
+                .setMultiChoiceItems(items, checked, (dialog, which, isChecked) -> checked[which] = isChecked)
+                .setPositiveButton("Install", (d, w) -> {
+                    java.util.List<ModVersion.Dependency> selected = new java.util.ArrayList<>();
+                    for (int i = 0; i < deps.size(); i++) { if (checked[i]) selected.add(deps.get(i)); }
+                    startDownload(version, file, selected);
+                })
+                .setNeutralButton("Skip deps", (d, w) -> startDownload(version, file, new java.util.ArrayList<>()))
+                .setNegativeButton("Cancel", null)
+                .show();
+        });
 
     private void startDownload(ModVersion version, ModVersion.VersionFile file, java.util.List<ModVersion.Dependency> dependencies) {
         String subFolder = "resourcepack".equals(projectType) ? "resourcepacks"
