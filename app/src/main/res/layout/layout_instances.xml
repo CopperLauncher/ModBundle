@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#181818">
+
+    <!-- Top bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp"
+        android:background="#232323">
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/ic_folder"
+            android:tint="#9649b8"
+            android:layout_marginEnd="10dp"/>
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Instances"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:textStyle="bold"/>
+        <ImageButton
+            android:id="@+id/btn_add_instance"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_add"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:tint="#9649b8"
+            android:contentDescription="Pick instance folder manually"/>
+    </LinearLayout>
+
+    <!-- Active instance banner -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="#1e1e1e"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="10dp">
+        <ImageView
+            android:layout_width="14dp"
+            android:layout_height="14dp"
+            android:src="@drawable/ic_menu_home"
+            android:tint="#9649b8"
+            android:layout_marginEnd="8dp"/>
+        <TextView
+            android:id="@+id/tv_active_instance"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="No instance selected"
+            android:textColor="#9649b8"
+            android:textSize="11sp"/>
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#2e2e2e"/>
+
+
+    <!-- Instance list -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/instances_recycler"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:paddingHorizontal="10dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:clipToPadding="false"/>
+
+</LinearLayout>

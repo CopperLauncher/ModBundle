@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:background="@drawable/bg_mod_card"
+    android:layout_marginHorizontal="12dp"
+    android:layout_marginTop="8dp"
+    android:padding="12dp"
+    android:gravity="center_vertical">
+
+    <!-- Checkbox for bulk select -->
+    <CheckBox
+        android:id="@+id/mod_checkbox"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:buttonTint="#9649b8"
+        android:layout_marginEnd="8dp"
+        android:visibility="gone"/>
+
+    <!-- Mod Icon -->
+    <ImageView
+        android:id="@+id/mod_icon"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:scaleType="centerCrop"
+        android:background="@drawable/bg_icon_placeholder"
+        android:layout_marginEnd="10dp"/>
+
+    <!-- Info -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+        <TextView
+            android:id="@+id/mod_filename"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:maxLines="1"
+            android:ellipsize="middle"/>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="4dp">
+            <TextView
+                android:id="@+id/mod_type_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=".jar"
+                android:textColor="#2D7D46"
+                android:textSize="10sp"
+                android:background="@drawable/bg_mod_card"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="1dp"
+                android:layout_marginEnd="8dp"/>
+            <TextView
+                android:id="@+id/mod_size"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#888"
+                android:textSize="11sp"/>
+
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Update button -->
+    <ImageButton
+        android:id="@+id/btn_update_mod"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:src="@drawable/ic_update"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:tint="#9649b8"
+        android:contentDescription="Update mod"
+        android:visibility="gone"
+        android:layout_marginEnd="2dp"/>
+
+    <!-- Disable button -->
+    <ImageButton
+        android:id="@+id/btn_disable_mod"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:src="@drawable/ic_pause"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:tint="#888888"
+        android:contentDescription="Disable mod"
+        android:layout_marginEnd="2dp"/>
+
+    <!-- Delete button -->
+    <ImageButton
+        android:id="@+id/btn_delete_mod"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:src="@drawable/ic_delete"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:tint="#E53935"
+        android:contentDescription="Delete mod"/>
+</LinearLayout>

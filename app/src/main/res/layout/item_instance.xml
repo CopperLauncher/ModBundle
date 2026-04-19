@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:background="@drawable/background_card"
+    android:padding="12dp"
+    android:layout_marginBottom="8dp"
+    android:gravity="center_vertical">
+
+    <!-- Instance logo (tap to change) -->
+    <ImageView
+        android:id="@+id/instance_logo"
+        android:layout_width="42dp"
+        android:layout_height="42dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/ic_launcher_monochrome"
+        android:background="@drawable/bg_icon_placeholder"
+        android:padding="6dp"
+        android:layout_marginEnd="12dp"
+        android:clickable="true"
+        android:focusable="true"/>
+
+    <!-- Name + path + loader/version -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+        <TextView
+            android:id="@+id/instance_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold"/>
+        <TextView
+            android:id="@+id/instance_path"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#666666"
+            android:textSize="10sp"
+            android:maxLines="1"
+            android:ellipsize="middle"
+            android:layout_marginTop="2dp"/>
+        <LinearLayout
+            android:id="@+id/instance_meta_row"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="4dp"
+            android:gravity="center_vertical">
+            <TextView
+                android:id="@+id/instance_loader_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#9649b8"
+                android:textSize="10sp"
+                android:background="@drawable/bg_icon_placeholder"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="2dp"
+                android:layout_marginEnd="6dp"
+                android:visibility="gone"/>
+            <TextView
+                android:id="@+id/instance_version_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#888888"
+                android:textSize="10sp"
+                android:visibility="gone"/>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Rename/edit button -->
+    <ImageButton
+        android:id="@+id/btn_rename_instance"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:src="@drawable/ic_edit_profile"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:tint="#666666"
+        android:contentDescription="Edit"
+        android:layout_marginEnd="2dp"/>
+
+    <!-- Delete instance button -->
+    <ImageButton
+        android:id="@+id/btn_delete_instance"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:src="@drawable/ic_delete"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:tint="#E53935"
+        android:contentDescription="Remove"
+        android:layout_marginEnd="2dp"/>
+
+    <!-- Select button -->
+    <Button
+        android:id="@+id/btn_select_instance"
+        android:layout_width="wrap_content"
+        android:layout_height="32dp"
+        android:text="Select"
+        android:textSize="11sp"
+        android:textColor="#FFFFFF"
+        android:backgroundTint="#9649b8"
+        android:insetTop="0dp"
+        android:insetBottom="0dp"
+        style="@style/Widget.MaterialComponents.Button"/>
+</LinearLayout>
