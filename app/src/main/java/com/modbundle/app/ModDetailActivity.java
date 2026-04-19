@@ -247,13 +247,11 @@ public class ModDetailActivity extends AppCompatActivity {
         }
 
         java.util.List<ModVersion.Dependency> deps = new java.util.ArrayList<>();
-        java.util.List<String> labels = new java.util.ArrayList<>();
         java.util.List<Boolean> checked = new java.util.ArrayList<>();
         for (ModVersion.Dependency dep : version.dependencies) {
-            if (dep == null || dep.projectId == null) continue;
+            if (dep == null || (dep.projectId == null && dep.versionId == null)) continue;
             deps.add(dep);
             String type = dep.dependencyType != null ? dep.dependencyType : "required";
-            labels.add(("required".equals(type) ? "Required: " : "Optional: ") + dep.projectId);
             checked.add("required".equals(type));
         }
 
@@ -262,14 +260,42 @@ public class ModDetailActivity extends AppCompatActivity {
             return;
         }
 
-        CharSequence[] items = labels.toArray(new CharSequence[0]);
+        // Fetch project names for all deps, then show dialog
+        String[] labels = new String[deps.size()];
+        java.util.concurrent.atomic.AtomicInteger remaining = new java.util.concurrent.atomic.AtomicInteger(deps.size());
+        for (int i = 0; i < deps.size(); i++) {
+            final int idx = i;
+            ModVersion.Dependency dep = deps.get(idx);
+            String type = dep.dependencyType != null ? dep.dependencyType : "required";
+            String prefix = "required".equals(type) ? "Required: " : "Optional: ";
+            if (dep.projectId != null) {
+                api.getProject(dep.projectId, new com.modbundle.app.api.ModrinthApi.Callback<com.modbundle.app.model.ModResult>() {
+                    public void onSuccess(com.modbundle.app.model.ModResult result) {
+                        labels[idx] = prefix + (result != null && result.title != null ? result.title : dep.projectId);
+                        if (remaining.decrementAndGet() == 0) handler.post(() -> showDepsDialog(version, file, deps, labels, checked));
+                    }
+                    public void onError(String e) {
+                        labels[idx] = prefix + dep.projectId;
+                        if (remaining.decrementAndGet() == 0) handler.post(() -> showDepsDialog(version, file, deps, labels, checked));
+                    }
+                });
+            } else {
+                // Only versionId available — use it as fallback label
+                labels[idx] = prefix + dep.versionId;
+                if (remaining.decrementAndGet() == 0) handler.post(() -> showDepsDialog(version, file, deps, labels, checked));
+            }
+        }
+    }
+
+    private void showDepsDialog(ModVersion version, ModVersion.VersionFile file,
+                                java.util.List<ModVersion.Dependency> deps,
+                                String[] labels, java.util.List<Boolean> checked) {
         boolean[] selected = new boolean[checked.size()];
         for (int i = 0; i < checked.size(); i++) selected[i] = checked.get(i);
 
         new AlertDialog.Builder(this)
-            .setTitle("Install dependencies")
-            .setMessage("Select which dependencies to install with this mod.")
-            .setMultiChoiceItems(items, selected, (dialog, which, isChecked) -> selected[which] = isChecked)
+            .setTitle("Select dependencies to install")
+            .setMultiChoiceItems(labels, selected, (dialog, which, isChecked) -> selected[which] = isChecked)
             .setPositiveButton("Install selected", (d, w) -> {
                 java.util.List<ModVersion.Dependency> selectedDeps = new java.util.ArrayList<>();
                 for (int i = 0; i < deps.size(); i++) {
@@ -285,6 +311,11 @@ public class ModDetailActivity extends AppCompatActivity {
     private void startDownload(ModVersion version, ModVersion.VersionFile file, java.util.List<ModVersion.Dependency> dependencies) {
         String subFolder = "resourcepack".equals(projectType) ? "resourcepacks"
                          : "shader".equals(projectType) ? "shaderpacks" : "mods";
+        // Use actual version/loader from the selected mod version
+        if (version.gameVersions != null && !version.gameVersions.isEmpty())
+            gameVersion = version.gameVersions.get(0);
+        if (version.loaders != null && !version.loaders.isEmpty())
+            loader = version.loaders.get(0);
 
         ProgressDialog pDialog = new ProgressDialog(this);
         pDialog.setTitle("Installing " + mod.title);

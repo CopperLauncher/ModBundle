@@ -43,7 +43,7 @@ public class ModrinthApi {
                 if (!version.isEmpty() && !version.equalsIgnoreCase("Any"))
                     facets.append(",[\"versions:").append(version).append("\"]");
                 if (!loaderValue.isEmpty() && !loaderValue.equalsIgnoreCase("Any"))
-                    facets.append(",[\"loaders:").append(loaderValue).append("\"]");
+                    facets.append(",[\"categories:").append(loaderValue).append("\"]");
                 facets.append("]");
                 StringBuilder url = new StringBuilder(BASE + "/search");
                 url.append("?facets=").append(encode(facets.toString()));

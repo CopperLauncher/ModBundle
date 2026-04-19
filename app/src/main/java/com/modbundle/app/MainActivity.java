@@ -11,6 +11,7 @@ import android.os.Environment;
 import android.Manifest;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.widget.CompoundButtonCompat;
 import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.os.Looper;
@@ -311,8 +312,9 @@ public class MainActivity extends AppCompatActivity {
             String path = instance.path;
             android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
             layout.setOrientation(android.widget.LinearLayout.VERTICAL);
-            layout.setPadding(48, 16, 48, 0);
+            layout.setPadding(48, 16, 48, 8);
 
+            // Name
             android.widget.EditText etName = new android.widget.EditText(this);
             etName.setHint("Instance name");
             etName.setText(currentName);
@@ -320,27 +322,85 @@ public class MainActivity extends AppCompatActivity {
             etName.setHintTextColor(0xFF666666);
             layout.addView(etName);
 
-            android.widget.EditText etLoader = new android.widget.EditText(this);
-            etLoader.setHint("Loader (fabric/forge/neoforge/quilt)");
-            etLoader.setText(instanceNameStore.getLoader(path));
-            etLoader.setTextColor(0xFFFFFFFF);
-            etLoader.setHintTextColor(0xFF666666);
-            layout.addView(etLoader);
+            // Loader label + spinner
+            android.widget.TextView tvLoader = new android.widget.TextView(this);
+            tvLoader.setText("Loader");
+            tvLoader.setTextColor(0xFF888888);
+            tvLoader.setTextSize(12f);
+            tvLoader.setPadding(0, 20, 0, 4);
+            layout.addView(tvLoader);
+            android.widget.Spinner spLoader = new android.widget.Spinner(this);
+            android.widget.ArrayAdapter<String> lAd = new android.widget.ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, LOADERS);
+            lAd.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            spLoader.setAdapter(lAd);
+            String savedL = instanceNameStore.getLoader(path);
+            for (int i = 0; i < LOADERS.length; i++) {
+                if (LOADERS[i].equalsIgnoreCase(savedL)) { spLoader.setSelection(i); break; }
+            }
+            layout.addView(spLoader);
 
-            android.widget.EditText etVersion = new android.widget.EditText(this);
-            etVersion.setHint("MC Version (e.g. 1.21.1)");
-            etVersion.setText(instanceNameStore.getVersion(path));
-            etVersion.setTextColor(0xFFFFFFFF);
-            etVersion.setHintTextColor(0xFF666666);
-            layout.addView(etVersion);
+            // MC Version label + spinner
+            android.widget.TextView tvVer = new android.widget.TextView(this);
+            tvVer.setText("Minecraft Version");
+            tvVer.setTextColor(0xFF888888);
+            tvVer.setTextSize(12f);
+            tvVer.setPadding(0, 20, 0, 4);
+            layout.addView(tvVer);
+
+            // Include snapshots checkbox
+            android.widget.CheckBox cbSnap = new android.widget.CheckBox(this);
+            cbSnap.setText("Include Snapshots");
+            cbSnap.setTextColor(0xFFAAAAAA);
+            CompoundButtonCompat.setButtonTintList(cbSnap, android.content.res.ColorStateList.valueOf(0xFF9649b8));
+            cbSnap.setChecked(false);
+            layout.addView(cbSnap);
+
+            android.widget.Spinner spVersion = new android.widget.Spinner(this);
+            layout.addView(spVersion);
+
+            // Load versions using current snapshots pref
+            final boolean[] snapState = {false};
+            java.util.List<String> verList = new java.util.ArrayList<>();
+            verList.add("Any");
+            android.widget.ArrayAdapter<String> verAd = new android.widget.ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, verList);
+            verAd.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            spVersion.setAdapter(verAd);
+
+            // Helper to reload versions
+            final Runnable[] loadVersions = {null};
+            loadVersions[0] = () -> {
+                api.getGameVersions(snapState[0], versions -> {
+                    handler.post(() -> {
+                        verList.clear();
+                        verList.add("Any");
+                        verList.addAll(versions.subList(Math.min(1, versions.size()), versions.size()));
+                        verAd.notifyDataSetChanged();
+                        String savedV = instanceNameStore.getVersion(path);
+                        for (int i = 0; i < verList.size(); i++) {
+                            if (savedV.equals(verList.get(i))) { spVersion.setSelection(i); break; }
+                        }
+                    });
+                }, err -> {});
+            };
+            loadVersions[0].run();
+
+            cbSnap.setOnCheckedChangeListener((btn, isChecked) -> {
+                snapState[0] = isChecked;
+                loadVersions[0].run();
+            });
 
             new AlertDialog.Builder(this)
                 .setTitle("Edit Instance")
                 .setView(layout)
                 .setPositiveButton("Save", (d, w) -> {
                     String newName = etName.getText().toString().trim();
-                    String newLoader = etLoader.getText().toString().trim();
-                    String newVersion = etVersion.getText().toString().trim();
+                    String newLoader = spLoader.getSelectedItem().toString();
+                    Object selV = spVersion.getSelectedItem();
+                    String newVersion = selV != null ? selV.toString() : "";
+                    if ("Any".equals(newLoader)) newLoader = "";
+                    if ("Any".equals(newVersion)) newVersion = "";
                     if (!newName.isEmpty()) instanceNameStore.setName(path, newName);
                     instanceNameStore.setLoader(path, newLoader);
                     instanceNameStore.setVersion(path, newVersion);
@@ -844,12 +904,23 @@ public class MainActivity extends AppCompatActivity {
         };
 
         String subFolder = "resourcepack".equals(currentProjectType) ? "resourcepacks" : "shader".equals(currentProjectType) ? "shaderpacks" : "mods";
-        String dependencyGameVersion = getSelectedVersion();
-        String dependencyLoader = getSelectedLoader();
-        if (version.gameVersions != null && !version.gameVersions.isEmpty()) {
+        // Use instance-stored loader/version for dependency downloads
+        String depVersion = "", depLoader = "";
+        Uri depUri = prefs.getInstanceUri();
+        if (depUri != null) {
+            String depPath = "file".equals(depUri.getScheme()) ? depUri.getPath() : depUri.toString();
+            if (depPath != null) {
+                depLoader = instanceNameStore.getLoader(depPath);
+                depVersion = instanceNameStore.getVersion(depPath);
+            }
+        }
+        String dependencyGameVersion = depVersion.isEmpty() ? getSelectedVersion() : depVersion;
+        String dependencyLoader = depLoader.isEmpty() ? getSelectedLoader() : depLoader;
+        // Override with actual mod's version/loader if more specific
+        if (version.gameVersions != null && !version.gameVersions.isEmpty() && !version.gameVersions.get(0).isEmpty()) {
             dependencyGameVersion = version.gameVersions.get(0);
         }
-        if (version.loaders != null && !version.loaders.isEmpty()) {
+        if (version.loaders != null && !version.loaders.isEmpty() && !version.loaders.get(0).isEmpty()) {
             dependencyLoader = version.loaders.get(0);
         }
         Uri instanceUri = prefs.getInstanceUri();
@@ -936,9 +1007,10 @@ public class MainActivity extends AppCompatActivity {
                     // Use instance stored loader/version, fallback to spinner, then mod metadata
                     String iMcVer = "", iLoader = "";
                     android.net.Uri iUri = prefs.getInstanceUri();
-                    if (iUri != null && "file".equals(iUri.getScheme()) && iUri.getPath() != null) {
-                        iLoader = instanceNameStore.getLoader(iUri.getPath());
-                        iMcVer = instanceNameStore.getVersion(iUri.getPath());
+                    if (iUri != null) {
+                        String ipath = "file".equals(iUri.getScheme()) ? iUri.getPath() : iUri.toString();
+                        if (ipath != null) { iLoader = instanceNameStore.getLoader(ipath);
+                        iMcVer = instanceNameStore.getVersion(ipath); }
                     }
                     if (iMcVer.isEmpty()) iMcVer = getSelectedVersion();
                     if (iLoader.isEmpty()) iLoader = getSelectedLoader();
@@ -1014,11 +1086,24 @@ public class MainActivity extends AppCompatActivity {
             }
             public void onError(String error) { handler.post(() -> { progress.dismiss(); Toast.makeText(MainActivity.this, "Update failed", Toast.LENGTH_SHORT).show(); }); }
         };
+        // Get instance loader/version for correct update download
+        String upLoader = "", upVersion = "";
         Uri instanceUri = prefs.getInstanceUri();
-        if (instanceUri != null && "content".equals(instanceUri.getScheme())) downloader.downloadMod(file, instanceUri, "mods", null, "", "", callback);
-        else {
+        if (instanceUri != null) {
+            String ipath = "file".equals(instanceUri.getScheme()) ? instanceUri.getPath() : instanceUri.toString();
+            if (ipath != null) {
+                upLoader = instanceNameStore.getLoader(ipath);
+                upVersion = instanceNameStore.getVersion(ipath);
+            }
+        }
+        final String finalUpLoader = upLoader.isEmpty() ? getSelectedLoader() : upLoader;
+        final String finalUpVersion = upVersion.isEmpty() ? getSelectedVersion() : upVersion;
+
+        if (instanceUri != null && "content".equals(instanceUri.getScheme())) {
+            downloader.downloadMod(file, instanceUri, "mods", null, finalUpVersion, finalUpLoader, callback);
+        } else {
             java.io.File instanceDir = getLegacyInstanceDir();
-            if (instanceDir != null) downloader.downloadMod(file, new java.io.File(instanceDir, "mods"), null, "", "", callback);
+            if (instanceDir != null) downloader.downloadMod(file, new java.io.File(instanceDir, "mods"), null, finalUpVersion, finalUpLoader, callback);
         }
     }
 
