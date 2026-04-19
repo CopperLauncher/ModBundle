@@ -725,6 +725,25 @@ public class MainActivity extends AppCompatActivity {
     private void setupSettings() {
         btnChooseFolder.setOnClickListener(v -> openFolderPicker());
         updateFolderLabel();
+
+        int[] linkIds = {
+            R.id.tv_link_youtube, R.id.tv_github_link, R.id.tv_link_kofi,
+            R.id.tv_link_patreon, R.id.tv_discord_link,
+            R.id.tv_link_copper_github, R.id.tv_link_modrinth
+        };
+        for (int id : linkIds) {
+            android.view.View lv = findViewById(id);
+            if (lv != null) {
+                lv.setOnClickListener(view -> {
+                    Object tag = view.getTag();
+                    if (tag != null) {
+                        startActivity(new android.content.Intent(
+                            android.content.Intent.ACTION_VIEW,
+                            android.net.Uri.parse(tag.toString())));
+                    }
+                });
+            }
+        }
     }
 
     private void searchMods(boolean reset) {

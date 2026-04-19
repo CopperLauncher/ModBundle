@@ -430,55 +430,196 @@
                 android:background="#333"
                 android:layout_marginVertical="24dp"/>
 
+            <!-- About Section -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="ModBundle"
-                android:textColor="#555"
-                android:textSize="11sp"
-                android:gravity="center"/>
+                android:text="About"
+                android:textColor="#BBBBBB"
+                android:textSize="13sp"
+                android:layout_marginBottom="12dp"/>
 
-            <TextView
+            <!-- YouTube -->
+            <LinearLayout
+                android:id="@+id/tv_link_youtube"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Part of the CopperLauncher project"
-                android:textColor="#9649b8"
-                android:textSize="11sp"
-                android:gravity="center"
-                android:layout_marginTop="4dp"/>
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="github.com/CopperLauncher/ModBundle"
-                android:textColor="#555"
-                android:textSize="10sp"
-                android:gravity="center"
-                android:layout_marginTop="2dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_about_bubble"
+                android:padding="14dp"
+                android:layout_marginBottom="8dp"
                 android:clickable="true"
                 android:focusable="true"
-                android:tag="https://github.com/CopperLauncher/ModBundle"
-                android:id="@+id/tv_github_link"/>
-            <TextView
+                android:tag="https://www.youtube.com/@MaxJubayerYT">
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_youtube"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="YouTube"
+                    android:textColor="#DDDDDD"
+                    android:textSize="13sp"
+                    android:layout_marginStart="12dp"/>
+            </LinearLayout>
+
+            <!-- GitHub ModBundle -->
+            <LinearLayout
+                android:id="@+id/tv_github_link"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="dsc.gg/CopperLauncher"
-                android:textColor="#555"
-                android:textSize="10sp"
-                android:gravity="center"
-                android:layout_marginTop="2dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_about_bubble"
+                android:padding="14dp"
+                android:layout_marginBottom="8dp"
                 android:clickable="true"
                 android:focusable="true"
-                android:tag="https://dsc.gg/CopperLauncher"
-                android:id="@+id/tv_discord_link"/>
-            <TextView
+                android:tag="https://github.com/CopperLauncher/ModBundle">
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_github"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="GitHub — ModBundle"
+                    android:textColor="#DDDDDD"
+                    android:textSize="13sp"
+                    android:layout_marginStart="12dp"/>
+            </LinearLayout>
+
+            <!-- Ko-fi -->
+            <LinearLayout
+                android:id="@+id/tv_link_kofi"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Powered by Modrinth API &amp; CurseForge API"
-                android:textColor="#444"
-                android:textSize="10sp"
-                android:gravity="center"
-                android:layout_marginTop="6dp"/>
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_about_bubble"
+                android:padding="14dp"
+                android:layout_marginBottom="8dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:tag="https://ko-fi.com/maxjubayeryt">
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_kofi"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Ko-fi"
+                    android:textColor="#DDDDDD"
+                    android:textSize="13sp"
+                    android:layout_marginStart="12dp"/>
+            </LinearLayout>
 
+            <!-- Patreon -->
+            <LinearLayout
+                android:id="@+id/tv_link_patreon"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_about_bubble"
+                android:padding="14dp"
+                android:layout_marginBottom="8dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:tag="https://patreon.com/MaxJubayerYT">
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_patreon"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Patreon"
+                    android:textColor="#DDDDDD"
+                    android:textSize="13sp"
+                    android:layout_marginStart="12dp"/>
+            </LinearLayout>
+
+            <!-- Discord -->
+            <LinearLayout
+                android:id="@+id/tv_discord_link"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_about_bubble"
+                android:padding="14dp"
+                android:layout_marginBottom="8dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:tag="https://discord.com/invite/r8wUtzMzUe">
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_discord"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Discord"
+                    android:textColor="#DDDDDD"
+                    android:textSize="13sp"
+                    android:layout_marginStart="12dp"/>
+            </LinearLayout>
+
+            <!-- GitHub CopperLauncher -->
+            <LinearLayout
+                android:id="@+id/tv_link_copper_github"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_about_bubble"
+                android:padding="14dp"
+                android:layout_marginBottom="8dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:tag="https://github.com/CopperLauncher/">
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_github"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="GitHub — CopperLauncher"
+                    android:textColor="#DDDDDD"
+                    android:textSize="13sp"
+                    android:layout_marginStart="12dp"/>
+            </LinearLayout>
+
+            <!-- Modrinth -->
+            <LinearLayout
+                android:id="@+id/tv_link_modrinth"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_about_bubble"
+                android:padding="14dp"
+                android:layout_marginBottom="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:tag="https://modrinth.com/organization/copperlauncher">
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_modrinth"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Modrinth — CopperLauncher"
+                    android:textColor="#DDDDDD"
+                    android:textSize="13sp"
+                    android:layout_marginStart="12dp"/>
+            </LinearLayout>
             </LinearLayout>
             </ScrollView>
 
