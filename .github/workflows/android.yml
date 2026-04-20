@@ -52,15 +52,23 @@ jobs:
       - name: Decode Keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/modbundle.jks
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --stacktrace
       - name: Build Release APK
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew assembleRelease --stacktrace
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ModBundle-Debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: ModBundle-release
-          path: app/build/outputs/apk/release/*.apk
+          name: ModBundle-Release
+          path: app/build/outputs/apk/release/app-release.apk
           retention-days: 30
