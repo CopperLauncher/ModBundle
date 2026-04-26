@@ -248,6 +248,7 @@ public class MainActivity extends AppCompatActivity {
                         android.R.layout.simple_spinner_item, arr);
                     a.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
                     spinnerVersion.setAdapter(a);
+                    searchMods(true);
                 });
             }, e -> {});
         });
@@ -261,6 +262,7 @@ public class MainActivity extends AppCompatActivity {
             btnTypeMods.setBackgroundTintList(active); btnTypeMods.setTextColor(0xFFFFFFFF);
             btnTypeResourcepack.setBackgroundTintList(inactive); btnTypeResourcepack.setTextColor(0xFFAAAAAA);
             btnTypeShader.setBackgroundTintList(inactive); btnTypeShader.setTextColor(0xFFAAAAAA);
+            spinnerLoader.setVisibility(View.VISIBLE);
             searchMods(true);
         });
         btnTypeResourcepack.setOnClickListener(v -> {
@@ -268,6 +270,7 @@ public class MainActivity extends AppCompatActivity {
             btnTypeResourcepack.setBackgroundTintList(active); btnTypeResourcepack.setTextColor(0xFFFFFFFF);
             btnTypeMods.setBackgroundTintList(inactive); btnTypeMods.setTextColor(0xFFAAAAAA);
             btnTypeShader.setBackgroundTintList(inactive); btnTypeShader.setTextColor(0xFFAAAAAA);
+            spinnerLoader.setVisibility(View.INVISIBLE);
             searchMods(true);
         });
         btnTypeShader.setOnClickListener(v -> {
@@ -275,6 +278,7 @@ public class MainActivity extends AppCompatActivity {
             btnTypeShader.setBackgroundTintList(active); btnTypeShader.setTextColor(0xFFFFFFFF);
             btnTypeMods.setBackgroundTintList(inactive); btnTypeMods.setTextColor(0xFFAAAAAA);
             btnTypeResourcepack.setBackgroundTintList(inactive); btnTypeResourcepack.setTextColor(0xFFAAAAAA);
+            spinnerLoader.setVisibility(View.INVISIBLE);
             searchMods(true);
         });
     }
@@ -762,7 +766,9 @@ public class MainActivity extends AppCompatActivity {
 
         currentQuery = searchInput.getText().toString().trim();
         String version = getSelectedVersion();
-        String loader  = getSelectedLoader();
+        // Resource packs and shader packs don't use loaders — sending one causes Modrinth
+        // to ignore the version filter and return unfiltered results
+        String loader = "mod".equals(currentProjectType) ? getSelectedLoader() : "";
 
         if (useCurseForge) {
             curseForgeApi.searchMods(currentQuery, version, loader, currentOffset, currentProjectType, results -> {
@@ -995,7 +1001,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void checkUpdates() {
-        if (!"mods".equals(currentInstalledType)) return;
         btnCheckUpdates.setEnabled(false);
         btnCheckUpdates.setText("Checking...");
         installedAdapter.getMetaCache().clear();
@@ -1012,58 +1017,100 @@ public class MainActivity extends AppCompatActivity {
         for (Object mod : modsCopy) {
             new Thread(() -> {
                 try {
-                    com.modbundle.app.utils.ModMetadata meta = (mod instanceof androidx.documentfile.provider.DocumentFile)
-                        ? com.modbundle.app.utils.ModMetadataParser.parse(this, (androidx.documentfile.provider.DocumentFile) mod)
-                        : com.modbundle.app.utils.ModMetadataParser.parse((java.io.File) mod);
+                    String fileName = (mod instanceof androidx.documentfile.provider.DocumentFile)
+                        ? ((androidx.documentfile.provider.DocumentFile) mod).getName()
+                        : ((java.io.File) mod).getName();
 
-                    if (meta == null || meta.modId == null) {
-                        if (pending.decrementAndGet() <= 0) finishCheckUpdates(updatesFound.get());
-                        return;
-                    }
-                    final com.modbundle.app.utils.ModMetadata finalMeta = meta;
-                    String fileName = (mod instanceof androidx.documentfile.provider.DocumentFile) ? ((androidx.documentfile.provider.DocumentFile) mod).getName() : ((java.io.File) mod).getName();
-
-                    // Use instance stored loader/version, fallback to spinner, then mod metadata
-                    String iMcVer = "", iLoader = "";
-                    android.net.Uri iUri = prefs.getInstanceUri();
-                    if (iUri != null) {
-                        String ipath = "file".equals(iUri.getScheme()) ? iUri.getPath() : iUri.toString();
-                        if (ipath != null) { iLoader = instanceNameStore.getLoader(ipath);
-                        iMcVer = instanceNameStore.getVersion(ipath); }
-                    }
-                    if (iMcVer.isEmpty()) iMcVer = getSelectedVersion();
-                    if (iLoader.isEmpty()) iLoader = getSelectedLoader();
-                    final String checkVer = iMcVer;
-                    final String checkLoad = iLoader;
-                    api.getVersions(finalMeta.modId, checkVer, checkLoad,
-                        versions -> {
-                            if (versions != null && !versions.isEmpty()) {
-                                // Find version matching instance loader+version strictly
-                                com.modbundle.app.model.ModVersion latest = null;
-                                for (com.modbundle.app.model.ModVersion v : versions) {
-                                    boolean lOk = !checkLoad.isEmpty() && v.loaders != null && v.loaders.contains(checkLoad);
-                                    boolean mOk = !checkVer.isEmpty() && v.gameVersions != null && v.gameVersions.contains(checkVer);
-                                    if (lOk && mOk) { latest = v; break; }
-                                }
-                                if (latest == null && !versions.isEmpty()) latest = versions.get(0);
-                                boolean alreadyLatest = false;
-                                if (latest.files != null) {
-                                    for (com.modbundle.app.model.ModVersion.VersionFile vf : latest.files) {
-                                        if (vf.filename != null && vf.filename.equals(fileName)) { alreadyLatest = true; break; }
+                    if ("mods".equals(currentInstalledType)) {
+                        // Mods: use embedded metadata (fabric.mod.json / mods.toml)
+                        com.modbundle.app.utils.ModMetadata meta = (mod instanceof androidx.documentfile.provider.DocumentFile)
+                            ? com.modbundle.app.utils.ModMetadataParser.parse(this, (androidx.documentfile.provider.DocumentFile) mod)
+                            : com.modbundle.app.utils.ModMetadataParser.parse((java.io.File) mod);
+                        if (meta == null || meta.modId == null) {
+                            if (pending.decrementAndGet() <= 0) finishCheckUpdates(updatesFound.get());
+                            return;
+                        }
+                        final com.modbundle.app.utils.ModMetadata finalMeta = meta;
+                        String iMcVer = "", iLoader = "";
+                        android.net.Uri iUri = prefs.getInstanceUri();
+                        if (iUri != null) {
+                            String ipath = "file".equals(iUri.getScheme()) ? iUri.getPath() : iUri.toString();
+                            if (ipath != null) { iLoader = instanceNameStore.getLoader(ipath); iMcVer = instanceNameStore.getVersion(ipath); }
+                        }
+                        if (iMcVer.isEmpty()) iMcVer = getSelectedVersion();
+                        if (iLoader.isEmpty()) iLoader = getSelectedLoader();
+                        final String checkVer = iMcVer;
+                        final String checkLoad = iLoader;
+                        api.getVersions(finalMeta.modId, checkVer, checkLoad,
+                            versions -> {
+                                if (versions != null && !versions.isEmpty()) {
+                                    com.modbundle.app.model.ModVersion latest = null;
+                                    for (com.modbundle.app.model.ModVersion v : versions) {
+                                        boolean lOk = !checkLoad.isEmpty() && v.loaders != null && v.loaders.contains(checkLoad);
+                                        boolean mOk = !checkVer.isEmpty() && v.gameVersions != null && v.gameVersions.contains(checkVer);
+                                        if (lOk && mOk) { latest = v; break; }
+                                    }
+                                    if (latest == null) latest = versions.get(0);
+                                    boolean alreadyLatest = false;
+                                    if (latest.files != null) {
+                                        for (com.modbundle.app.model.ModVersion.VersionFile vf : latest.files) {
+                                            if (vf.filename != null && vf.filename.equals(fileName)) { alreadyLatest = true; break; }
+                                        }
+                                    }
+                                    if (!alreadyLatest) {
+                                        finalMeta.hasUpdate = true;
+                                        finalMeta.latestVersion = latest.versionNumber;
+                                        com.modbundle.app.model.ModVersion.VersionFile f = com.modbundle.app.utils.ModDownloader.getPrimaryFile(latest);
+                                        if (f != null) { finalMeta.latestFileUrl = f.url; finalMeta.latestFileName = f.filename; }
+                                        updatesFound.incrementAndGet();
                                     }
                                 }
-                                if (!alreadyLatest) {
-                                    finalMeta.hasUpdate = true;
-                                    finalMeta.latestVersion = latest.versionNumber;
-                                    com.modbundle.app.model.ModVersion.VersionFile f = com.modbundle.app.utils.ModDownloader.getPrimaryFile(latest);
-                                    if (f != null) { finalMeta.latestFileUrl = f.url; finalMeta.latestFileName = f.filename; }
-                                    updatesFound.incrementAndGet();
-                                }
-                            }
-                            handler.post(() -> installedAdapter.updateMetaCache(fileName, finalMeta));
-                            if (pending.decrementAndGet() <= 0) finishCheckUpdates(updatesFound.get());
-                        },
-                        error -> { if (pending.decrementAndGet() <= 0) finishCheckUpdates(updatesFound.get()); });
+                                handler.post(() -> installedAdapter.updateMetaCache(fileName, finalMeta));
+                                if (pending.decrementAndGet() <= 0) finishCheckUpdates(updatesFound.get());
+                            },
+                            error -> { if (pending.decrementAndGet() <= 0) finishCheckUpdates(updatesFound.get()); });
+                    } else {
+                        // Resource packs / shaders: identify by SHA1 hash via Modrinth API
+                        try {
+                            java.io.InputStream is = (mod instanceof androidx.documentfile.provider.DocumentFile)
+                                ? getContentResolver().openInputStream(((androidx.documentfile.provider.DocumentFile) mod).getUri())
+                                : new java.io.FileInputStream((java.io.File) mod);
+                            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-1");
+                            byte[] buf = new byte[8192]; int n;
+                            while ((n = is.read(buf)) != -1) digest.update(buf, 0, n);
+                            is.close();
+                            StringBuilder hexHash = new StringBuilder();
+                            for (byte b : digest.digest()) hexHash.append(String.format("%02x", b));
+                            final String sha1 = hexHash.toString();
+
+                            api.getVersionByHash(sha1,
+                                currentVersion -> {
+                                    // We have the current version — now get the latest for this project
+                                    String projectId = currentVersion.projectId;
+                                    String checkVer2 = getSelectedVersion();
+                                    api.getVersions(projectId, checkVer2, "",
+                                        versions -> {
+                                            com.modbundle.app.utils.ModMetadata meta2 = new com.modbundle.app.utils.ModMetadata();
+                                            meta2.modId = projectId;
+                                            if (versions != null && !versions.isEmpty()) {
+                                                com.modbundle.app.model.ModVersion latest = versions.get(0);
+                                                boolean alreadyLatest = latest.id != null && latest.id.equals(currentVersion.id);
+                                                if (!alreadyLatest) {
+                                                    meta2.hasUpdate = true;
+                                                    meta2.latestVersion = latest.versionNumber;
+                                                    com.modbundle.app.model.ModVersion.VersionFile f = com.modbundle.app.utils.ModDownloader.getPrimaryFile(latest);
+                                                    if (f != null) { meta2.latestFileUrl = f.url; meta2.latestFileName = f.filename; }
+                                                    updatesFound.incrementAndGet();
+                                                }
+                                            }
+                                            handler.post(() -> installedAdapter.updateMetaCache(fileName, meta2));
+                                            if (pending.decrementAndGet() <= 0) finishCheckUpdates(updatesFound.get());
+                                        },
+                                        err -> { if (pending.decrementAndGet() <= 0) finishCheckUpdates(updatesFound.get()); });
+                                },
+                                err -> { if (pending.decrementAndGet() <= 0) finishCheckUpdates(updatesFound.get()); });
+                        } catch (Exception hashEx) { if (pending.decrementAndGet() <= 0) finishCheckUpdates(updatesFound.get()); }
+                    }
                 } catch (Exception e) { if (pending.decrementAndGet() <= 0) finishCheckUpdates(updatesFound.get()); }
             }).start();
         }
@@ -1118,11 +1165,16 @@ public class MainActivity extends AppCompatActivity {
         final String finalUpLoader = upLoader.isEmpty() ? getSelectedLoader() : upLoader;
         final String finalUpVersion = upVersion.isEmpty() ? getSelectedVersion() : upVersion;
 
+        String subFolder = "mods";
+        if ("resourcepacks".equals(currentInstalledType)) subFolder = "resourcepacks";
+        else if ("shaderpacks".equals(currentInstalledType)) subFolder = "shaderpacks";
+        final String finalSubFolder = subFolder;
+
         if (instanceUri != null && "content".equals(instanceUri.getScheme())) {
-            downloader.downloadMod(file, instanceUri, "mods", null, finalUpVersion, finalUpLoader, callback);
+            downloader.downloadMod(file, instanceUri, finalSubFolder, null, finalUpVersion, finalUpLoader, callback);
         } else {
             java.io.File instanceDir = getLegacyInstanceDir();
-            if (instanceDir != null) downloader.downloadMod(file, new java.io.File(instanceDir, "mods"), null, finalUpVersion, finalUpLoader, callback);
+            if (instanceDir != null) downloader.downloadMod(file, new java.io.File(instanceDir, finalSubFolder), null, finalUpVersion, finalUpLoader, callback);
         }
     }
 

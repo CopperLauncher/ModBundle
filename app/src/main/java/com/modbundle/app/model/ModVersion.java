@@ -5,6 +5,7 @@ import java.util.List;
 
 public class ModVersion {
     @SerializedName("id")             public String id;
+    @SerializedName("project_id")     public String projectId;
     @SerializedName("name")           public String name;
     @SerializedName("version_number") public String versionNumber;
     @SerializedName("version_type") public String versionType;

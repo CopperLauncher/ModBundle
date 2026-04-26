@@ -159,4 +159,20 @@ public class ModrinthApi {
         }).start();
     }
 
+    public void getVersionByHash(String sha1Hash, OnSuccess<ModVersion> onSuccess, OnError onError) {
+        new Thread(() -> {
+            try {
+                Request request = new Request.Builder()
+                        .url(BASE + "/version_file/" + sha1Hash + "?algorithm=sha1")
+                        .header("User-Agent", USER_AGENT)
+                        .build();
+                try (Response response = client.newCall(request).execute()) {
+                    if (!response.isSuccessful()) { onError.onError("Not found"); return; }
+                    onSuccess.onSuccess(gson.fromJson(response.body().string(), ModVersion.class));
+                }
+            } catch (IOException e) { onError.onError(e.getMessage()); }
+        }).start();
+    }
+
+
 }
