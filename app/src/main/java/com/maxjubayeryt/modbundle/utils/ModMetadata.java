@@ -1,4 +1,4 @@
-package com.modbundle.app.utils;
+package com.maxjubayeryt.modbundle.utils;
 
 public class ModMetadata {
     public String modId;

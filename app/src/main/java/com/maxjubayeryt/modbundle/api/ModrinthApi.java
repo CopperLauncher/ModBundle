@@ -1,8 +1,8 @@
-package com.modbundle.app.api;
+package com.maxjubayeryt.modbundle.api;
 
-import com.modbundle.app.model.ModResult;
-import com.modbundle.app.model.ModVersion;
-import com.modbundle.app.model.SearchResponse;
+import com.maxjubayeryt.modbundle.model.ModResult;
+import com.maxjubayeryt.modbundle.model.ModVersion;
+import com.maxjubayeryt.modbundle.model.SearchResponse;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
@@ -123,6 +123,32 @@ public class ModrinthApi {
                         .build();
                 try (Response response = client.newCall(request).execute()) {
                     if (!response.isSuccessful()) { onError.onError("Server error: " + response.code()); return; }
+                    onSuccess.onSuccess(gson.fromJson(response.body().string(), ModVersion.class));
+                }
+            } catch (IOException e) {
+                onError.onError("Network error: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    /**
+     * Looks up which project+version a file belongs to by its SHA1 hash, regardless
+     * of content type (mods, resourcepacks and shaderpacks are all resolvable this
+     * way). Used for update-checking and remote icon lookup of files that don't carry
+     * their own project id (resource packs, shader packs, and old mods with no
+     * embedded metadata) — ported from Copper-Android's InstalledModAdapter,
+     * which calls this "version_file/{hash}" endpoint before falling back to
+     * CurseForge fingerprint matching.
+     */
+    public void getVersionFromHash(String sha1, OnSuccess<ModVersion> onSuccess, OnError onError) {
+        new Thread(() -> {
+            try {
+                Request request = new Request.Builder()
+                        .url(BASE + "/version_file/" + sha1 + "?algorithm=sha1")
+                        .header("User-Agent", USER_AGENT)
+                        .build();
+                try (Response response = client.newCall(request).execute()) {
+                    if (!response.isSuccessful()) { onError.onError("Not found on Modrinth: " + response.code()); return; }
                     onSuccess.onSuccess(gson.fromJson(response.body().string(), ModVersion.class));
                 }
             } catch (IOException e) {

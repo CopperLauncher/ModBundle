@@ -1,4 +1,4 @@
-package com.modbundle.app;
+package com.maxjubayeryt.modbundle;
 
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
@@ -26,18 +26,18 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.modbundle.app.api.ModrinthApi;
-import com.modbundle.app.api.CurseForgeApi;
-import com.modbundle.app.model.ModResult;
-import com.modbundle.app.model.ModVersion;
-import com.modbundle.app.model.SearchResponse;
-import com.modbundle.app.ui.InstalledModsAdapter;
-import com.modbundle.app.ui.ModAdapter;
-import com.modbundle.app.ui.InstanceAdapter;
+import com.maxjubayeryt.modbundle.api.ModrinthApi;
+import com.maxjubayeryt.modbundle.api.CurseForgeApi;
+import com.maxjubayeryt.modbundle.model.ModResult;
+import com.maxjubayeryt.modbundle.model.ModVersion;
+import com.maxjubayeryt.modbundle.model.SearchResponse;
+import com.maxjubayeryt.modbundle.ui.InstalledModsAdapter;
+import com.maxjubayeryt.modbundle.ui.ModAdapter;
+import com.maxjubayeryt.modbundle.ui.InstanceAdapter;
 import java.util.ArrayList;
-import com.modbundle.app.utils.ModDownloader;
-import com.modbundle.app.utils.PrefManager;
-import com.modbundle.app.ModDetailActivity;
+import com.maxjubayeryt.modbundle.utils.ModDownloader;
+import com.maxjubayeryt.modbundle.utils.PrefManager;
+import com.maxjubayeryt.modbundle.ModDetailActivity;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import java.util.Arrays;
 import java.util.List;
@@ -82,7 +82,7 @@ public class MainActivity extends AppCompatActivity {
     private InstanceAdapter instanceAdapter;
     private final java.util.List<InstanceAdapter.InstanceEntry> instanceList = new ArrayList<>();
     private ModDownloader downloader;
-    private com.modbundle.app.utils.InstanceNameStore instanceNameStore;
+    private com.maxjubayeryt.modbundle.utils.InstanceNameStore instanceNameStore;
     private PrefManager prefs;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
@@ -101,7 +101,7 @@ public class MainActivity extends AppCompatActivity {
 
         prefs = new PrefManager(this);
         downloader = new ModDownloader(this);
-        instanceNameStore = new com.modbundle.app.utils.InstanceNameStore(this);
+        instanceNameStore = new com.maxjubayeryt.modbundle.utils.InstanceNameStore(this);
         requestStoragePermissionIfNeeded();
         initViews();
         setupBottomNav();
@@ -543,7 +543,7 @@ public class MainActivity extends AppCompatActivity {
 
 
     private void setupSourceToggle() {
-        boolean curseForgeAvailable = com.modbundle.app.api.CurseForgeApi.isEnabled();
+        boolean curseForgeAvailable = com.maxjubayeryt.modbundle.api.CurseForgeApi.isEnabled();
         if (!curseForgeAvailable) {
             btnCurseForge.setEnabled(false);
             btnCurseForge.setAlpha(0.5f);
@@ -585,12 +585,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupBrowseRecycler() {
-        modAdapter = new ModAdapter(this, modResults, new com.modbundle.app.ui.ModAdapter.OnInstallClickListener() {
-            public void onInstallClick(com.modbundle.app.model.ModResult mod) {
+        modAdapter = new ModAdapter(this, modResults, new com.maxjubayeryt.modbundle.ui.ModAdapter.OnInstallClickListener() {
+            public void onInstallClick(com.maxjubayeryt.modbundle.model.ModResult mod) {
                 if (!prefs.hasInstanceFolder()) { showFolderPickerPrompt(); return; }
                 showInstallDialog(mod);
             }
-            public void onModClick(com.modbundle.app.model.ModResult mod) {
+            public void onModClick(com.maxjubayeryt.modbundle.model.ModResult mod) {
                 if (!prefs.hasInstanceFolder()) { showFolderPickerPrompt(); return; }
                 String modJson = new com.google.gson.Gson().toJson(mod);
                 Intent intent = new Intent(MainActivity.this, ModDetailActivity.class);
@@ -660,6 +660,7 @@ public class MainActivity extends AppCompatActivity {
             },
             (mod, meta) -> performUpdate(mod, meta)
         );
+        installedAdapter.setOnSwitchVersionListener(this::showSwitchVersionDialog);
 
         btnCheckUpdates.setOnClickListener(v -> checkUpdates());
 
@@ -673,7 +674,7 @@ public class MainActivity extends AppCompatActivity {
                 String name = (mod instanceof androidx.documentfile.provider.DocumentFile)
                     ? ((androidx.documentfile.provider.DocumentFile) mod).getName()
                     : ((java.io.File) mod).getName();
-                com.modbundle.app.utils.ModMetadata meta = installedAdapter.getMetaCache().get(name);
+                com.maxjubayeryt.modbundle.utils.ModMetadata meta = installedAdapter.getMetaCache().get(name);
                 if (meta != null && meta.hasUpdate) performUpdate(mod, meta);
             }
         });
@@ -685,7 +686,7 @@ public class MainActivity extends AppCompatActivity {
                     String name = (mod instanceof androidx.documentfile.provider.DocumentFile)
                         ? ((androidx.documentfile.provider.DocumentFile) mod).getName()
                         : ((java.io.File) mod).getName();
-                    com.modbundle.app.utils.ModMetadata meta = installedAdapter.getMetaCache().get(name);
+                    com.maxjubayeryt.modbundle.utils.ModMetadata meta = installedAdapter.getMetaCache().get(name);
                     if (meta != null && meta.hasUpdate) performUpdate(mod, meta);
                 }
             } else {
@@ -693,7 +694,7 @@ public class MainActivity extends AppCompatActivity {
                     String name = (mod instanceof androidx.documentfile.provider.DocumentFile)
                         ? ((androidx.documentfile.provider.DocumentFile) mod).getName()
                         : ((java.io.File) mod).getName();
-                    com.modbundle.app.utils.ModMetadata meta = installedAdapter.getMetaCache().get(name);
+                    com.maxjubayeryt.modbundle.utils.ModMetadata meta = installedAdapter.getMetaCache().get(name);
                     if (meta != null && meta.hasUpdate) performUpdate(mod, meta);
                 }
             }
@@ -1012,15 +1013,15 @@ public class MainActivity extends AppCompatActivity {
         for (Object mod : modsCopy) {
             new Thread(() -> {
                 try {
-                    com.modbundle.app.utils.ModMetadata meta = (mod instanceof androidx.documentfile.provider.DocumentFile)
-                        ? com.modbundle.app.utils.ModMetadataParser.parse(this, (androidx.documentfile.provider.DocumentFile) mod)
-                        : com.modbundle.app.utils.ModMetadataParser.parse((java.io.File) mod);
+                    com.maxjubayeryt.modbundle.utils.ModMetadata meta = (mod instanceof androidx.documentfile.provider.DocumentFile)
+                        ? com.maxjubayeryt.modbundle.utils.ModMetadataParser.parse(this, (androidx.documentfile.provider.DocumentFile) mod)
+                        : com.maxjubayeryt.modbundle.utils.ModMetadataParser.parse((java.io.File) mod);
 
                     if (meta == null || meta.modId == null) {
                         if (pending.decrementAndGet() <= 0) finishCheckUpdates(updatesFound.get());
                         return;
                     }
-                    final com.modbundle.app.utils.ModMetadata finalMeta = meta;
+                    final com.maxjubayeryt.modbundle.utils.ModMetadata finalMeta = meta;
                     String fileName = (mod instanceof androidx.documentfile.provider.DocumentFile) ? ((androidx.documentfile.provider.DocumentFile) mod).getName() : ((java.io.File) mod).getName();
 
                     // Use instance stored loader/version, fallback to spinner, then mod metadata
@@ -1039,8 +1040,8 @@ public class MainActivity extends AppCompatActivity {
                         versions -> {
                             if (versions != null && !versions.isEmpty()) {
                                 // Find version matching instance loader+version strictly
-                                com.modbundle.app.model.ModVersion latest = null;
-                                for (com.modbundle.app.model.ModVersion v : versions) {
+                                com.maxjubayeryt.modbundle.model.ModVersion latest = null;
+                                for (com.maxjubayeryt.modbundle.model.ModVersion v : versions) {
                                     boolean lOk = !checkLoad.isEmpty() && v.loaders != null && v.loaders.contains(checkLoad);
                                     boolean mOk = !checkVer.isEmpty() && v.gameVersions != null && v.gameVersions.contains(checkVer);
                                     if (lOk && mOk) { latest = v; break; }
@@ -1048,14 +1049,14 @@ public class MainActivity extends AppCompatActivity {
                                 if (latest == null && !versions.isEmpty()) latest = versions.get(0);
                                 boolean alreadyLatest = false;
                                 if (latest.files != null) {
-                                    for (com.modbundle.app.model.ModVersion.VersionFile vf : latest.files) {
+                                    for (com.maxjubayeryt.modbundle.model.ModVersion.VersionFile vf : latest.files) {
                                         if (vf.filename != null && vf.filename.equals(fileName)) { alreadyLatest = true; break; }
                                     }
                                 }
                                 if (!alreadyLatest) {
                                     finalMeta.hasUpdate = true;
                                     finalMeta.latestVersion = latest.versionNumber;
-                                    com.modbundle.app.model.ModVersion.VersionFile f = com.modbundle.app.utils.ModDownloader.getPrimaryFile(latest);
+                                    com.maxjubayeryt.modbundle.model.ModVersion.VersionFile f = com.maxjubayeryt.modbundle.utils.ModDownloader.getPrimaryFile(latest);
                                     if (f != null) { finalMeta.latestFileUrl = f.url; finalMeta.latestFileName = f.filename; }
                                     updatesFound.incrementAndGet();
                                 }
@@ -1076,9 +1077,141 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void performUpdate(Object mod, com.modbundle.app.utils.ModMetadata meta) {
+    /**
+     * Lets the user switch an already-installed mod, resource pack, or shader pack to a
+     * different version — ported from Copper-Android's ModVersionListFragment version
+     * picker, generalized here to work for all three content types (Copper only offers
+     * it for mods). Resolves the installed file's Modrinth project via
+     * {@link com.maxjubayeryt.modbundle.utils.ContentUpdateChecker} (hash-based, so it works even
+     * for resource/shader packs that carry no embedded project id), then reuses the same
+     * VersionAdapter the browse screen uses to list and pick a version to switch to.
+     */
+    private void showSwitchVersionDialog(Object mod) {
+        String fileName = (mod instanceof androidx.documentfile.provider.DocumentFile)
+                ? ((androidx.documentfile.provider.DocumentFile) mod).getName()
+                : ((java.io.File) mod).getName();
+
+        ProgressDialog resolving = new ProgressDialog(this);
+        resolving.setTitle("Looking up " + fileName + "\u2026");
+        resolving.setMessage("Identifying content on Modrinth/CurseForge");
+        resolving.setCancelable(true);
+        resolving.show();
+
+        com.maxjubayeryt.modbundle.utils.ContentUpdateChecker checker = new com.maxjubayeryt.modbundle.utils.ContentUpdateChecker();
+
+        // Reuse the checker's own hash resolution instead of duplicating it: ask it for
+        // "updates" against an empty game version/loader filter, which — because it hits
+        // Modrinth's version_file-by-hash endpoint first — also gives us the project id
+        // via the version list that comes back.
+        java.util.function.BiConsumer<String, String> openVersionList = (projectId, source) -> {
+            resolving.dismiss();
+            if (projectId == null) {
+                Toast.makeText(this, "Couldn't identify this file on Modrinth or CurseForge", Toast.LENGTH_LONG).show();
+                return;
+            }
+            api.getVersions(projectId, getSelectedVersion(), getSelectedLoader(), versions -> handler.post(() -> {
+                if (versions == null || versions.isEmpty()) {
+                    Toast.makeText(this, "No versions found for this content", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_version_list, null);
+                RecyclerView recycler = dialogView.findViewById(R.id.detail_versions_recycler);
+                recycler.setLayoutManager(new LinearLayoutManager(this));
+                AlertDialog dialog = new AlertDialog.Builder(this)
+                        .setTitle("Switch version")
+                        .setView(dialogView)
+                        .setNegativeButton("Cancel", null)
+                        .create();
+                VersionAdapter adapter = new VersionAdapter(versions, (version, file) -> {
+                    dialog.dismiss();
+                    switchInstalledContentVersion(mod, fileName, file);
+                });
+                recycler.setAdapter(adapter);
+                dialog.show();
+            }), error -> handler.post(() ->
+                    Toast.makeText(this, "Failed to load versions: " + error, Toast.LENGTH_SHORT).show()));
+        };
+
+        if (mod instanceof androidx.documentfile.provider.DocumentFile) {
+            checker.check(this, (androidx.documentfile.provider.DocumentFile) mod, "", "", result ->
+                    resolveProjectIdThen((androidx.documentfile.provider.DocumentFile) mod, null, openVersionList));
+        } else {
+            checker.check((java.io.File) mod, "", "", result ->
+                    resolveProjectIdThen(null, (java.io.File) mod, openVersionList));
+        }
+    }
+
+    /**
+     * ContentUpdateChecker.Result deliberately doesn't expose the resolved project id
+     * (it's only meant for update/icon lookups), so for "switch version" we re-hash the
+     * file here and query Modrinth's version_file endpoint directly to get it — the same
+     * lookup ContentUpdateChecker does internally, kept in one place there and reused
+     * here to avoid growing that class's public surface just for this dialog.
+     */
+    private void resolveProjectIdThen(androidx.documentfile.provider.DocumentFile safFile, java.io.File plainFile,
+                                       java.util.function.BiConsumer<String, String> callback) {
+        new Thread(() -> {
+            try {
+                java.io.InputStream is = safFile != null
+                        ? getContentResolver().openInputStream(safFile.getUri())
+                        : new java.io.FileInputStream(plainFile);
+                if (is == null) { handler.post(() -> callback.accept(null, null)); return; }
+                java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+                byte[] buf = new byte[8192]; int read;
+                while ((read = is.read(buf)) != -1) bos.write(buf, 0, read);
+                is.close();
+                java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-1");
+                byte[] digest = md.digest(bos.toByteArray());
+                StringBuilder sb = new StringBuilder();
+                for (byte b : digest) sb.append(String.format("%02x", b));
+
+                api.getVersionFromHash(sb.toString(),
+                        version -> handler.post(() -> callback.accept(version.projectId, "modrinth")),
+                        err -> handler.post(() -> callback.accept(null, null)));
+            } catch (Exception e) {
+                handler.post(() -> callback.accept(null, null));
+            }
+        }).start();
+    }
+
+    /** Downloads the picked version into the same subfolder/disabled-state as the file it replaces. */
+    private void switchInstalledContentVersion(Object mod, String oldFileName, ModVersion.VersionFile newFile) {
+        boolean wasDisabled = oldFileName.endsWith(".disabled");
+        String targetName = wasDisabled ? newFile.filename + ".disabled" : newFile.filename;
+
+        ProgressDialog progress = new ProgressDialog(this);
+        progress.setTitle("Switching version\u2026");
+        progress.show();
+
+        ModDownloader.DownloadCallback callback = new ModDownloader.DownloadCallback() {
+            public void onProgress(String fileName, int percent) { handler.post(() -> progress.setMessage(percent + "%")); }
+            public void onSuccess(String fileName) {
+                handler.post(() -> {
+                    progress.dismiss();
+                    if (mod instanceof androidx.documentfile.provider.DocumentFile) ((androidx.documentfile.provider.DocumentFile) mod).delete();
+                    else if (mod instanceof java.io.File) ((java.io.File) mod).delete();
+                    refreshInstalled();
+                    Toast.makeText(MainActivity.this, "Switched to " + newFile.filename, Toast.LENGTH_SHORT).show();
+                });
+            }
+            public void onError(String error) {
+                handler.post(() -> { progress.dismiss(); Toast.makeText(MainActivity.this, "Switch failed: " + error, Toast.LENGTH_SHORT).show(); });
+            }
+        };
+
+        Uri instanceUri = prefs.getInstanceUri();
+        if (instanceUri != null) {
+            downloader.downloadMod(newFile, instanceUri, currentInstalledType, null, getSelectedVersion(), getSelectedLoader(), callback);
+        } else {
+            java.io.File instanceDir = prefs.getInstanceFile();
+            java.io.File subDir = new java.io.File(instanceDir, currentInstalledType);
+            downloader.downloadMod(newFile, subDir, null, getSelectedVersion(), getSelectedLoader(), callback);
+        }
+    }
+
+    private void performUpdate(Object mod, com.maxjubayeryt.modbundle.utils.ModMetadata meta) {
         if (meta.latestFileUrl == null) return;
-        com.modbundle.app.model.ModVersion.VersionFile file = new com.modbundle.app.model.ModVersion.VersionFile();
+        com.maxjubayeryt.modbundle.model.ModVersion.VersionFile file = new com.maxjubayeryt.modbundle.model.ModVersion.VersionFile();
         file.url = meta.latestFileUrl; file.filename = meta.latestFileName; file.primary = true;
         if (mod instanceof androidx.documentfile.provider.DocumentFile) ((androidx.documentfile.provider.DocumentFile) mod).delete();
         else if (mod instanceof java.io.File) ((java.io.File) mod).delete();
@@ -1087,7 +1220,7 @@ public class MainActivity extends AppCompatActivity {
         progress.setTitle("Updating...");
         progress.show();
 
-        com.modbundle.app.utils.ModDownloader.DownloadCallback callback = new com.modbundle.app.utils.ModDownloader.DownloadCallback() {
+        com.maxjubayeryt.modbundle.utils.ModDownloader.DownloadCallback callback = new com.maxjubayeryt.modbundle.utils.ModDownloader.DownloadCallback() {
             public void onProgress(String fileName, int percent) {}
             public void onSuccess(String fileName) {
                 handler.post(() -> {
@@ -1097,7 +1230,7 @@ public class MainActivity extends AppCompatActivity {
                     refreshInstalled();
                     // Hide update bar if no more updates
                     boolean anyLeft = false;
-                    for (com.modbundle.app.utils.ModMetadata m : installedAdapter.getMetaCache().values()) {
+                    for (com.maxjubayeryt.modbundle.utils.ModMetadata m : installedAdapter.getMetaCache().values()) {
                         if (m.hasUpdate) { anyLeft = true; break; }
                     }
                     if (!anyLeft && layoutUpdateBar != null) layoutUpdateBar.setVisibility(View.GONE);

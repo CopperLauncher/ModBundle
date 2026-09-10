@@ -1,4 +1,4 @@
-package com.modbundle.app.model;
+package com.maxjubayeryt.modbundle.model;
 
 import com.google.gson.annotations.SerializedName;
 import java.util.List;

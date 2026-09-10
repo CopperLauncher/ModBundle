@@ -1,4 +1,4 @@
-package com.modbundle.app.ui;
+package com.maxjubayeryt.modbundle.ui;
 
 import android.view.LayoutInflater;
 import android.view.View;
@@ -9,9 +9,9 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.documentfile.provider.DocumentFile;
 import androidx.recyclerview.widget.RecyclerView;
-import com.modbundle.app.R;
-import com.modbundle.app.utils.ModIconLoader;
-import com.modbundle.app.utils.ModMetadata;
+import com.maxjubayeryt.modbundle.R;
+import com.maxjubayeryt.modbundle.utils.ModIconLoader;
+import com.maxjubayeryt.modbundle.utils.ModMetadata;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -23,11 +23,13 @@ public class InstalledModsAdapter extends RecyclerView.Adapter<InstalledModsAdap
     public interface OnDeleteListener { void onDelete(Object mod); }
     public interface OnDisableListener { void onDisable(Object mod); }
     public interface OnUpdateListener { void onUpdate(Object mod, ModMetadata meta); }
+    public interface OnSwitchVersionListener { void onSwitchVersion(Object mod); }
 
     private final List<Object> mods;
     private final OnDeleteListener deleteListener;
     private final OnDisableListener disableListener;
     private final OnUpdateListener updateListener;
+    private OnSwitchVersionListener switchVersionListener;
     private boolean showDisable = true;
     private boolean showCheckboxes = false;
     private String currentType = "mods";
@@ -44,6 +46,9 @@ public class InstalledModsAdapter extends RecyclerView.Adapter<InstalledModsAdap
         this.disableListener = disableListener;
         this.updateListener = updateListener;
     }
+
+    public void setOnSwitchVersionListener(OnSwitchVersionListener listener) { this.switchVersionListener = listener; }
+
 
     public void setShowDisable(boolean show) { this.showDisable = show; }
     public void setCurrentType(String type) { this.currentType = type; }
@@ -133,6 +138,11 @@ public class InstalledModsAdapter extends RecyclerView.Adapter<InstalledModsAdap
         holder.btnDisable.setOnClickListener(v -> { if (disableListener != null) disableListener.onDisable(modRef); });
 
         holder.btnDelete.setOnClickListener(v -> deleteListener.onDelete(modRef));
+
+        // Switch version button
+        holder.btnSwitchVersion.setOnClickListener(v -> {
+            if (switchVersionListener != null) switchVersionListener.onSwitchVersion(modRef);
+        });
     }
 
     private ModIconLoader.FileType getFileType() {
@@ -152,7 +162,7 @@ public class InstalledModsAdapter extends RecyclerView.Adapter<InstalledModsAdap
         CheckBox checkbox;
         android.widget.ImageView icon;
         TextView name, size, typeBadge;
-        ImageButton btnDelete, btnDisable, btnUpdate;
+        ImageButton btnDelete, btnDisable, btnUpdate, btnSwitchVersion;
         ViewHolder(View v) {
             super(v);
             checkbox = v.findViewById(R.id.mod_checkbox);
@@ -163,6 +173,7 @@ public class InstalledModsAdapter extends RecyclerView.Adapter<InstalledModsAdap
             btnDelete = v.findViewById(R.id.btn_delete_mod);
             btnDisable = v.findViewById(R.id.btn_disable_mod);
             btnUpdate = v.findViewById(R.id.btn_update_mod);
+            btnSwitchVersion = v.findViewById(R.id.btn_switch_version);
         }
     }
 }

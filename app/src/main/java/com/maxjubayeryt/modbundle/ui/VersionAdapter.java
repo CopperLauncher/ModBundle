@@ -1,4 +1,4 @@
-package com.modbundle.app.ui;
+package com.maxjubayeryt.modbundle.ui;
 
 import android.view.LayoutInflater;
 import android.view.View;
@@ -7,9 +7,9 @@ import android.widget.Button;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-import com.modbundle.app.R;
-import com.modbundle.app.model.ModVersion;
-import com.modbundle.app.utils.ModDownloader;
+import com.maxjubayeryt.modbundle.R;
+import com.maxjubayeryt.modbundle.model.ModVersion;
+import com.maxjubayeryt.modbundle.utils.ModDownloader;
 import java.util.List;
 
 public class VersionAdapter extends RecyclerView.Adapter<VersionAdapter.ViewHolder> {

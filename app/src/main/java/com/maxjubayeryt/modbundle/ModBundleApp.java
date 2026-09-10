@@ -1,4 +1,4 @@
-package com.modbundle.app;
+package com.maxjubayeryt.modbundle;
 
 import android.app.Application;
 import androidx.appcompat.app.AppCompatDelegate;

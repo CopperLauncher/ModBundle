@@ -1,4 +1,4 @@
-package com.modbundle.app.ui;
+package com.maxjubayeryt.modbundle.ui;
 
 import android.view.LayoutInflater;
 import android.view.View;
@@ -7,7 +7,7 @@ import android.widget.ImageButton;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-import com.modbundle.app.R;
+import com.maxjubayeryt.modbundle.R;
 import java.util.List;
 
 @Deprecated

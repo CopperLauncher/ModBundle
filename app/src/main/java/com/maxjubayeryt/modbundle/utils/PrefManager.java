@@ -1,4 +1,4 @@
-package com.modbundle.app.utils;
+package com.maxjubayeryt.modbundle.utils;
 
 import android.content.Context;
 import android.content.SharedPreferences;

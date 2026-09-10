@@ -1,10 +1,10 @@
-package com.modbundle.app.utils;
+package com.maxjubayeryt.modbundle.utils;
 
 import android.content.Context;
 import android.net.Uri;
 import androidx.documentfile.provider.DocumentFile;
-import com.modbundle.app.api.ModrinthApi;
-import com.modbundle.app.model.ModVersion;
+import com.maxjubayeryt.modbundle.api.ModrinthApi;
+import com.maxjubayeryt.modbundle.model.ModVersion;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;

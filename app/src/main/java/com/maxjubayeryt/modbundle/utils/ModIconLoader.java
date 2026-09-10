@@ -1,4 +1,4 @@
-package com.modbundle.app.utils;
+package com.maxjubayeryt.modbundle.utils;
 
 import android.content.Context;
 import android.graphics.Bitmap;
@@ -6,7 +6,7 @@ import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.widget.ImageView;
 import androidx.documentfile.provider.DocumentFile;
-import com.modbundle.app.R;
+import com.maxjubayeryt.modbundle.R;
 import java.io.InputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -15,17 +15,24 @@ public class ModIconLoader {
 
     public enum FileType { MOD, RESOURCEPACK, SHADER }
 
-    /** Load icon from a File path */
+    // Content whose embedded/local icon couldn't be found is retried against
+    // Modrinth/CurseForge at most once per session and remembered here, so a
+    // RecyclerView scrolling back and forth doesn't refire the same lookups —
+    // mirrors Copper's InstalledModAdapter#mIconCheckedNoResult behaviour.
+    private static final java.util.Set<String> sNoRemoteIcon =
+            java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+    private static final ContentUpdateChecker sUpdateChecker = new ContentUpdateChecker();
+
+    /** Load icon from a File path, falling back to Modrinth/CurseForge if there's no embedded one. */
     public static void load(Context ctx, java.io.File file, FileType type, ImageView target) {
         new Thread(() -> {
             try {
                 Bitmap bmp = extractIcon(ctx, new java.io.FileInputStream(file), type, file.getName());
                 if (bmp != null) {
-                    final Bitmap finalBmp = bmp;
-                    android.os.Handler h = new android.os.Handler(android.os.Looper.getMainLooper());
-                    h.post(() -> target.setImageBitmap(finalBmp));
+                    postBitmap(target, bmp);
                 } else {
-                    setDefault(ctx, target, type);
+                    tryRemoteIcon(ctx, file.getAbsolutePath(), target, type,
+                            cb -> sUpdateChecker.check(file, "", "", cb));
                 }
             } catch (Exception e) {
                 setDefault(ctx, target, type);
@@ -33,7 +40,7 @@ public class ModIconLoader {
         }).start();
     }
 
-    /** Load icon from a SAF DocumentFile */
+    /** Load icon from a SAF DocumentFile, falling back to Modrinth/CurseForge if there's no embedded one. */
     public static void load(Context ctx, DocumentFile file, FileType type, ImageView target) {
         new Thread(() -> {
             try {
@@ -42,15 +49,44 @@ public class ModIconLoader {
                 String name = file.getName() != null ? file.getName() : "";
                 Bitmap bmp = extractIcon(ctx, is, type, name);
                 if (bmp != null) {
-                    final Bitmap finalBmp = bmp;
-                    new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> target.setImageBitmap(finalBmp));
+                    postBitmap(target, bmp);
                 } else {
-                    setDefault(ctx, target, type);
+                    tryRemoteIcon(ctx, file.getUri().toString(), target, type,
+                            cb -> sUpdateChecker.check(ctx, file, "", "", cb));
                 }
             } catch (Exception e) {
                 setDefault(ctx, target, type);
             }
         }).start();
+    }
+
+    private interface CheckInvoker { void invoke(ContentUpdateChecker.ResultCallback cb); }
+
+    /**
+     * Remote icon fallback shared by both load() overloads: hashes the file (inside
+     * ContentUpdateChecker) to identify it on Modrinth, falling back to CurseForge
+     * fingerprint matching, then downloads+disk-caches the resolved icon_url/logo via
+     * RemoteIconCache. This is what actually makes shader packs and resource packs
+     * (which never carry an embedded icon the way mod jars do) show real icons instead
+     * of the generic placeholder — ported from Copper-Android's icon resolution chain.
+     */
+    private static void tryRemoteIcon(Context ctx, String tag, ImageView target, FileType type, CheckInvoker invoker) {
+        if (sNoRemoteIcon.contains(tag)) { setDefault(ctx, target, type); return; }
+        invoker.invoke(result -> {
+            if (result == null || result.iconUrl == null || result.iconUrl.isEmpty()) {
+                sNoRemoteIcon.add(tag);
+                setDefault(ctx, target, type);
+                return;
+            }
+            RemoteIconCache.get(ctx).getIcon(tag, result.iconUrl, bitmap -> {
+                if (bitmap != null) target.setImageBitmap(bitmap);
+                else { sNoRemoteIcon.add(tag); setDefault(ctx, target, type); }
+            });
+        });
+    }
+
+    private static void postBitmap(ImageView target, Bitmap bmp) {
+        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> target.setImageBitmap(bmp));
     }
 
     private static Bitmap extractIcon(Context ctx, InputStream inputStream, FileType type, String fileName) {

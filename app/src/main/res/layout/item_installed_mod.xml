@@ -68,6 +68,17 @@
         </LinearLayout>
     </LinearLayout>
 
+    <!-- Switch version button -->
+    <ImageButton
+        android:id="@+id/btn_switch_version"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:src="@drawable/ic_swap_horiz"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:tint="#9649b8"
+        android:contentDescription="Switch version"
+        android:layout_marginEnd="2dp"/>
+
     <!-- Update button -->
     <ImageButton
         android:id="@+id/btn_update_mod"

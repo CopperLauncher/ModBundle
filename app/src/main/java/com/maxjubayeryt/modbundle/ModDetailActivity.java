@@ -1,4 +1,4 @@
-package com.modbundle.app;
+package com.maxjubayeryt.modbundle;
 
 import android.content.Intent;
 import android.net.Uri;
@@ -16,13 +16,13 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.bumptech.glide.Glide;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
-import com.modbundle.app.api.CurseForgeApi;
-import com.modbundle.app.api.ModrinthApi;
-import com.modbundle.app.model.ModResult;
-import com.modbundle.app.model.ModVersion;
-import com.modbundle.app.ui.VersionAdapter;
-import com.modbundle.app.utils.ModDownloader;
-import com.modbundle.app.utils.PrefManager;
+import com.maxjubayeryt.modbundle.api.CurseForgeApi;
+import com.maxjubayeryt.modbundle.api.ModrinthApi;
+import com.maxjubayeryt.modbundle.model.ModResult;
+import com.maxjubayeryt.modbundle.model.ModVersion;
+import com.maxjubayeryt.modbundle.ui.VersionAdapter;
+import com.maxjubayeryt.modbundle.utils.ModDownloader;
+import com.maxjubayeryt.modbundle.utils.PrefManager;
 import android.app.ProgressDialog;
 import android.os.Handler;
 import android.os.Looper;
@@ -113,8 +113,8 @@ public class ModDetailActivity extends AppCompatActivity {
             }
         }
 
-        api.getProject(mod.projectId, new com.modbundle.app.api.ModrinthApi.Callback<com.modbundle.app.model.ModResult>() {
-            public void onSuccess(com.modbundle.app.model.ModResult fullMod) {
+        api.getProject(mod.projectId, new com.maxjubayeryt.modbundle.api.ModrinthApi.Callback<com.maxjubayeryt.modbundle.model.ModResult>() {
+            public void onSuccess(com.maxjubayeryt.modbundle.model.ModResult fullMod) {
                 handler.post(() -> {
                     if (tvFollowers != null) tvFollowers.setText(formatNumber(fullMod.followers));
                     if (tvDownloads != null) tvDownloads.setText(formatNumber(fullMod.downloads));
@@ -269,8 +269,8 @@ public class ModDetailActivity extends AppCompatActivity {
             String type = dep.dependencyType != null ? dep.dependencyType : "required";
             String prefix = "required".equals(type) ? "Required: " : "Optional: ";
             if (dep.projectId != null) {
-                api.getProject(dep.projectId, new com.modbundle.app.api.ModrinthApi.Callback<com.modbundle.app.model.ModResult>() {
-                    public void onSuccess(com.modbundle.app.model.ModResult result) {
+                api.getProject(dep.projectId, new com.maxjubayeryt.modbundle.api.ModrinthApi.Callback<com.maxjubayeryt.modbundle.model.ModResult>() {
+                    public void onSuccess(com.maxjubayeryt.modbundle.model.ModResult result) {
                         labels[idx] = prefix + (result != null && result.title != null ? result.title : dep.projectId);
                         if (remaining.decrementAndGet() == 0) handler.post(() -> showDepsDialog(version, file, deps, labels, checked));
                     }

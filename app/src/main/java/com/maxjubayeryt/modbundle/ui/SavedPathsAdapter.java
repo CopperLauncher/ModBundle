@@ -1,4 +1,4 @@
-package com.modbundle.app.ui;
+package com.maxjubayeryt.modbundle.ui;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;

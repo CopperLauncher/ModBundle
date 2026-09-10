@@ -1,4 +1,4 @@
-package com.modbundle.app.ui;
+package com.maxjubayeryt.modbundle.ui;
 
 import android.content.Context;
 import android.net.Uri;
@@ -11,8 +11,8 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-import com.modbundle.app.R;
-import com.modbundle.app.utils.InstanceNameStore;
+import com.maxjubayeryt.modbundle.R;
+import com.maxjubayeryt.modbundle.utils.InstanceNameStore;
 import java.io.File;
 import java.util.List;
 

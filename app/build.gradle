@@ -4,10 +4,10 @@ plugins {
 
 android {
     compileSdk 34
-    namespace 'com.modbundle.app'
+    namespace 'com.maxjubayeryt.modbundle'
 
     defaultConfig {
-        applicationId "com.modbundle.app"
+        applicationId "com.maxjubayeryt.modbundle"
         minSdk 26
         targetSdk 34
         versionCode 1
