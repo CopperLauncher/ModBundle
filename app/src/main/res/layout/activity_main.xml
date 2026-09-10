@@ -295,52 +295,6 @@
                     android:insetBottom="0dp"/>
             </LinearLayout>
 
-            <!-- Toolbar row 2: select all + update selected (hidden until updates found) -->
-            <LinearLayout
-                android:id="@+id/layout_update_bar"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:paddingHorizontal="12dp"
-                android:paddingBottom="6dp"
-                android:visibility="gone">
-                <CheckBox
-                    android:id="@+id/cb_select_all"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Select All"
-                    android:textColor="#AAAAAA"
-                    android:textSize="12sp"
-                    android:buttonTint="#9649b8"
-                    android:layout_marginEnd="8dp"/>
-                <View
-                    android:layout_width="0dp"
-                    android:layout_height="1dp"
-                    android:layout_weight="1"/>
-                <Button
-                    android:id="@+id/btn_update_selected"
-                    android:layout_width="wrap_content"
-                    android:layout_height="30dp"
-                    android:text="Update Selected"
-                    android:textColor="#FFFFFF"
-                    android:textSize="11sp"
-                    android:backgroundTint="#242424"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:layout_marginEnd="6dp"/>
-                <Button
-                    android:id="@+id/btn_update_all"
-                    android:layout_width="wrap_content"
-                    android:layout_height="30dp"
-                    android:text="Update All"
-                    android:textColor="#FFFFFF"
-                    android:textSize="11sp"
-                    android:backgroundTint="#9649b8"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"/>
-            </LinearLayout>
-
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/installed_recycler"
                 android:layout_width="match_parent"
@@ -607,7 +561,7 @@
                 android:layout_marginBottom="16dp"
                 android:clickable="true"
                 android:focusable="true"
-                android:tag="https://modrinth.com/organization/copperlauncher">
+                android:tag="https://modrinth.com/user/MaxJubayerYT">
                 <ImageView
                     android:layout_width="22dp"
                     android:layout_height="22dp"
@@ -615,7 +569,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Modrinth — CopperLauncher"
+                    android:text="Modrinth — MaxJubayerYT"
                     android:textColor="#DDDDDD"
                     android:textSize="13sp"
                     android:layout_marginStart="12dp"/>

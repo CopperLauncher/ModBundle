@@ -73,9 +73,7 @@ public class MainActivity extends AppCompatActivity {
     private Button btnTypeMods, btnTypeResourcepack, btnTypeShader;
     private TextView installedTabMods, installedTabShaders, installedTabResourcepacks, tvInstalledCount;
     private String currentInstalledType = "mods";
-    private android.widget.CheckBox cbSelectAll;
-    private android.widget.Button btnCheckUpdates, btnUpdateAll, btnUpdateSelected;
-    private android.view.View layoutUpdateBar;
+    private android.widget.Button btnCheckUpdates;
     private android.widget.CheckBox btnSnapshots;
     private boolean includeSnapshots = false;
     private RecyclerView instancesRecycler;
@@ -87,6 +85,12 @@ public class MainActivity extends AppCompatActivity {
     private com.maxjubayeryt.modbundle.utils.InstanceNameStore instanceNameStore;
     private PrefManager prefs;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    // Bounded pool for installed-list I/O and update checks — used instead of raw
+    // `new Thread()` per call so opening the Installed tab, disabling a mod, and
+    // "Check Updates" don't spawn dozens of threads at once (the thread-creation
+    // overhead itself was a big chunk of the multi-second lag after those actions).
+    private static final java.util.concurrent.ExecutorService sBgExecutor =
+            java.util.concurrent.Executors.newFixedThreadPool(3);
 
     private int currentOffset = 0;
     private String currentQuery = "";
@@ -166,11 +170,7 @@ public class MainActivity extends AppCompatActivity {
         installedTabShaders = findViewById(R.id.installed_tab_shaders);
         installedTabResourcepacks = findViewById(R.id.installed_tab_resourcepacks);
         tvInstalledCount = findViewById(R.id.tv_installed_count);
-        cbSelectAll = findViewById(R.id.cb_select_all);
         btnCheckUpdates = findViewById(R.id.btn_check_updates);
-        btnUpdateAll = findViewById(R.id.btn_update_all);
-        btnUpdateSelected = findViewById(R.id.btn_update_selected);
-        layoutUpdateBar = findViewById(R.id.layout_update_bar);
     }
 
     private void setupBottomNav() {
@@ -667,47 +667,6 @@ public class MainActivity extends AppCompatActivity {
 
         btnCheckUpdates.setOnClickListener(v -> checkUpdates());
 
-        btnUpdateSelected.setOnClickListener(v -> {
-            java.util.List<Object> toUpdate = installedAdapter.getSelectedMods();
-            if (toUpdate.isEmpty()) {
-                Toast.makeText(this, "No mods selected", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            for (Object mod : toUpdate) {
-                String name = (mod instanceof androidx.documentfile.provider.DocumentFile)
-                    ? ((androidx.documentfile.provider.DocumentFile) mod).getName()
-                    : ((java.io.File) mod).getName();
-                com.maxjubayeryt.modbundle.utils.ModMetadata meta = installedAdapter.getMetaCache().get(name);
-                if (meta != null && meta.hasUpdate) performUpdate(mod, meta);
-            }
-        });
-
-        btnUpdateAll.setOnClickListener(v -> {
-            java.util.List<Object> toUpdate = installedAdapter.getSelectedMods();
-            if (toUpdate.isEmpty()) {
-                for (Object mod : installedMods) {
-                    String name = (mod instanceof androidx.documentfile.provider.DocumentFile)
-                        ? ((androidx.documentfile.provider.DocumentFile) mod).getName()
-                        : ((java.io.File) mod).getName();
-                    com.maxjubayeryt.modbundle.utils.ModMetadata meta = installedAdapter.getMetaCache().get(name);
-                    if (meta != null && meta.hasUpdate) performUpdate(mod, meta);
-                }
-            } else {
-                for (Object mod : toUpdate) {
-                    String name = (mod instanceof androidx.documentfile.provider.DocumentFile)
-                        ? ((androidx.documentfile.provider.DocumentFile) mod).getName()
-                        : ((java.io.File) mod).getName();
-                    com.maxjubayeryt.modbundle.utils.ModMetadata meta = installedAdapter.getMetaCache().get(name);
-                    if (meta != null && meta.hasUpdate) performUpdate(mod, meta);
-                }
-            }
-        });
-
-        cbSelectAll.setOnCheckedChangeListener((btn, checked) -> {
-            installedAdapter.setShowCheckboxes(true);
-            if (checked) installedAdapter.selectAll();
-            else installedAdapter.deselectAll();
-        });
         installedRecycler.setLayoutManager(new LinearLayoutManager(this));
         installedRecycler.setHasFixedSize(true);
         installedRecycler.setNestedScrollingEnabled(false);
@@ -1014,7 +973,7 @@ public class MainActivity extends AppCompatActivity {
         java.util.concurrent.atomic.AtomicInteger updatesFound = new java.util.concurrent.atomic.AtomicInteger(0);
 
         for (Object mod : modsCopy) {
-            new Thread(() -> {
+            sBgExecutor.execute(() -> {
                 try {
                     com.maxjubayeryt.modbundle.utils.ModMetadata meta = (mod instanceof androidx.documentfile.provider.DocumentFile)
                         ? com.maxjubayeryt.modbundle.utils.ModMetadataParser.parse(this, (androidx.documentfile.provider.DocumentFile) mod)
@@ -1064,7 +1023,17 @@ public class MainActivity extends AppCompatActivity {
                                     updatesFound.incrementAndGet();
                                 }
                             }
-                            handler.post(() -> installedAdapter.updateMetaCache(fileName, finalMeta));
+                            // Results for dozens of mods can land within the same few
+                            // milliseconds (all requests fired near-simultaneously); calling
+                            // notifyDataSetChanged() once per result was what caused the
+                            // multi-second freeze right after "Check Updates" finished, since
+                            // that's N full-list rebinds stacked back to back. Results are
+                            // written straight into the cache here and the UI is refreshed
+                            // once via the debounced helper instead.
+                            handler.post(() -> {
+                                installedAdapter.getMetaCache().put(fileName, finalMeta);
+                                scheduleMetaCacheRefresh();
+                            });
                             if (pending.decrementAndGet() <= 0) finishCheckUpdates(updatesFound.get());
                         },
                         error -> { if (pending.decrementAndGet() <= 0) finishCheckUpdates(updatesFound.get()); });
@@ -1076,7 +1045,8 @@ public class MainActivity extends AppCompatActivity {
     private void finishCheckUpdates(int updatesFound) {
         handler.post(() -> {
             if (btnCheckUpdates != null) { btnCheckUpdates.setEnabled(true); btnCheckUpdates.setText("Check Updates"); }
-            if (layoutUpdateBar != null) layoutUpdateBar.setVisibility(updatesFound > 0 ? View.VISIBLE : View.GONE);
+            if (pendingMetaCacheRefresh != null) { handler.removeCallbacks(pendingMetaCacheRefresh); pendingMetaCacheRefresh = null; }
+            installedAdapter.notifyDataSetChanged();
         });
     }
 
@@ -1232,12 +1202,7 @@ public class MainActivity extends AppCompatActivity {
                     // Remove this mod's update entry from cache
                     installedAdapter.getMetaCache().remove(meta.latestFileName);
                     refreshInstalled();
-                    // Hide update bar if no more updates
-                    boolean anyLeft = false;
-                    for (com.maxjubayeryt.modbundle.utils.ModMetadata m : installedAdapter.getMetaCache().values()) {
-                        if (m.hasUpdate) { anyLeft = true; break; }
-                    }
-                    if (!anyLeft && layoutUpdateBar != null) layoutUpdateBar.setVisibility(View.GONE);
+                    Toast.makeText(MainActivity.this, "Updated!", Toast.LENGTH_SHORT).show();
                 });
             }
             public void onError(String error) { handler.post(() -> { progress.dismiss(); Toast.makeText(MainActivity.this, "Update failed", Toast.LENGTH_SHORT).show(); }); }
@@ -1264,41 +1229,52 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void refreshInstalled() {
-        try {
-            installedMods.clear();
-            Uri instanceUri = prefs.getInstanceUri();
-            if (instanceUri != null && "content".equals(instanceUri.getScheme())) {
-                androidx.documentfile.provider.DocumentFile instanceDir = androidx.documentfile.provider.DocumentFile.fromTreeUri(this, instanceUri);
-                if (instanceDir != null) {
-                    androidx.documentfile.provider.DocumentFile subDir = instanceDir.findFile(currentInstalledType);
-                    if (subDir != null) {
-                        for (androidx.documentfile.provider.DocumentFile f : subDir.listFiles()) {
-                            String name = f.getName();
-                            if (name != null && (name.endsWith(".jar") || name.endsWith(".zip") || name.endsWith(".disabled"))) installedMods.add(f);
+        // listFiles() on SAF DocumentFile trees (and even plain File I/O for large mod
+        // folders) is genuinely slow — each call is effectively a synchronous IPC round
+        // trip to the DocumentsProvider. Running it on the main thread is why opening the
+        // Installed tab (and refreshing it after every disable/update) used to freeze the
+        // UI. It's moved to a background executor here; the tab this result belongs to is
+        // captured up front so a stale result from a since-abandoned tab switch is dropped
+        // instead of overwriting the list for whichever tab is now showing.
+        final String requestedType = currentInstalledType;
+        sBgExecutor.execute(() -> {
+            List<Object> collected = new ArrayList<>();
+            try {
+                Uri instanceUri = prefs.getInstanceUri();
+                if (instanceUri != null && "content".equals(instanceUri.getScheme())) {
+                    androidx.documentfile.provider.DocumentFile instanceDir = androidx.documentfile.provider.DocumentFile.fromTreeUri(this, instanceUri);
+                    if (instanceDir != null) {
+                        androidx.documentfile.provider.DocumentFile subDir = instanceDir.findFile(requestedType);
+                        if (subDir != null) {
+                            for (androidx.documentfile.provider.DocumentFile f : subDir.listFiles()) {
+                                String name = f.getName();
+                                if (name != null && (name.endsWith(".jar") || name.endsWith(".zip") || name.endsWith(".disabled"))) collected.add(f);
+                            }
                         }
                     }
-                }
-            } else {
-                java.io.File instanceDir2 = getLegacyInstanceDir();
-                if (instanceDir2 != null) {
-                    java.io.File subDir = new java.io.File(instanceDir2, currentInstalledType);
-                    if (subDir.exists()) {
-                        java.io.File[] files = subDir.listFiles();
-                        if (files != null) {
-                            for (java.io.File f : files) {
-                                String name = f.getName();
-                                if (name.endsWith(".jar") || name.endsWith(".zip") || name.endsWith(".disabled")) installedMods.add(f);
+                } else {
+                    java.io.File instanceDir2 = getLegacyInstanceDir();
+                    if (instanceDir2 != null) {
+                        java.io.File subDir = new java.io.File(instanceDir2, requestedType);
+                        if (subDir.exists()) {
+                            java.io.File[] files = subDir.listFiles();
+                            if (files != null) {
+                                for (java.io.File f : files) {
+                                    String name = f.getName();
+                                    if (name.endsWith(".jar") || name.endsWith(".zip") || name.endsWith(".disabled")) collected.add(f);
+                                }
                             }
                         }
                     }
                 }
-            }
+            } catch (Exception e) { /* fall through with whatever was collected */ }
+
             // listFiles()/DocumentFile enumeration order isn't stable — it reflects filesystem/SAF
             // directory order, which can (and does) change after a rename. Disabling/enabling a
             // mod renames it (adds/removes ".disabled"), so without an explicit sort here the row
             // jumps to wherever the provider now happens to list it. Sorting by filename keeps the
             // list in the same order across refreshes regardless of enumeration order.
-            installedMods.sort((a, b) -> {
+            collected.sort((a, b) -> {
                 String nameA = (a instanceof androidx.documentfile.provider.DocumentFile)
                         ? ((androidx.documentfile.provider.DocumentFile) a).getName() : ((java.io.File) a).getName();
                 String nameB = (b instanceof androidx.documentfile.provider.DocumentFile)
@@ -1307,10 +1283,16 @@ public class MainActivity extends AppCompatActivity {
                 if (nameB == null) nameB = "";
                 return nameA.compareToIgnoreCase(nameB);
             });
-            installedAdapter.notifyDataSetChanged();
-            if (tvInstalledCount != null) tvInstalledCount.setText(installedMods.size() + " files");
-            emptyInstalled.setVisibility(installedMods.isEmpty() ? View.VISIBLE : View.GONE);
-        } catch (Exception e) {}
+
+            handler.post(() -> {
+                if (!requestedType.equals(currentInstalledType)) return; // user switched tabs while this was loading
+                installedMods.clear();
+                installedMods.addAll(collected);
+                installedAdapter.notifyDataSetChanged();
+                if (tvInstalledCount != null) tvInstalledCount.setText(installedMods.size() + " files");
+                emptyInstalled.setVisibility(installedMods.isEmpty() ? View.VISIBLE : View.GONE);
+            });
+        });
     }
 
     private java.io.File getLegacyInstanceDir() {
@@ -1483,6 +1465,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void saveFilters() { prefs.saveFilters(getSelectedVersion(), getSelectedLoader()); }
+
+    private Runnable pendingMetaCacheRefresh;
+    /**
+     * Coalesces bursts of per-mod update-check results into a single
+     * notifyDataSetChanged() ~150ms after the last one arrives, instead of one full
+     * RecyclerView rebind per result (see checkUpdates()).
+     */
+    private void scheduleMetaCacheRefresh() {
+        if (pendingMetaCacheRefresh != null) handler.removeCallbacks(pendingMetaCacheRefresh);
+        pendingMetaCacheRefresh = () -> { installedAdapter.notifyDataSetChanged(); pendingMetaCacheRefresh = null; };
+        handler.postDelayed(pendingMetaCacheRefresh, 150);
+    }
     private String getSelectedVersion() {
         String v = spinnerVersion.getSelectedItem() != null ? ((String) spinnerVersion.getSelectedItem()).trim() : "";
         return "Any".equalsIgnoreCase(v) ? "" : v;

@@ -22,10 +22,17 @@ public class ModIconLoader {
     private static final java.util.Set<String> sNoRemoteIcon =
             java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
     private static final ContentUpdateChecker sUpdateChecker = new ContentUpdateChecker();
+    // A RecyclerView rebind (scrolling, or any notifyDataSetChanged()) re-binds every
+    // visible row at once; spawning a raw `new Thread()` per icon load meant a burst of
+    // dozens of threads each time, which is itself expensive and was a real contributor
+    // to the lag after disabling/updating a mod. Icon loads now go through this small
+    // bounded pool instead — mirrors Copper's own sUpdateCheckExecutor pattern.
+    private static final java.util.concurrent.ExecutorService sIconExecutor =
+            java.util.concurrent.Executors.newFixedThreadPool(3);
 
     /** Load icon from a File path, falling back to Modrinth/CurseForge if there's no embedded one. */
     public static void load(Context ctx, java.io.File file, FileType type, ImageView target) {
-        new Thread(() -> {
+        sIconExecutor.execute(() -> {
             try {
                 Bitmap bmp = extractIcon(ctx, new java.io.FileInputStream(file), type, file.getName());
                 if (bmp != null) {
@@ -37,12 +44,12 @@ public class ModIconLoader {
             } catch (Exception e) {
                 setDefault(ctx, target, type);
             }
-        }).start();
+        });
     }
 
     /** Load icon from a SAF DocumentFile, falling back to Modrinth/CurseForge if there's no embedded one. */
     public static void load(Context ctx, DocumentFile file, FileType type, ImageView target) {
-        new Thread(() -> {
+        sIconExecutor.execute(() -> {
             try {
                 InputStream is = ctx.getContentResolver().openInputStream(file.getUri());
                 if (is == null) { setDefault(ctx, target, type); return; }
@@ -57,7 +64,7 @@ public class ModIconLoader {
             } catch (Exception e) {
                 setDefault(ctx, target, type);
             }
-        }).start();
+        });
     }
 
     private interface CheckInvoker { void invoke(ContentUpdateChecker.ResultCallback cb); }
