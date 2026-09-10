@@ -34,6 +34,8 @@ import com.maxjubayeryt.modbundle.model.SearchResponse;
 import com.maxjubayeryt.modbundle.ui.InstalledModsAdapter;
 import com.maxjubayeryt.modbundle.ui.ModAdapter;
 import com.maxjubayeryt.modbundle.ui.InstanceAdapter;
+import com.maxjubayeryt.modbundle.ui.VersionAdapter;
+import android.view.LayoutInflater;
 import java.util.ArrayList;
 import com.maxjubayeryt.modbundle.utils.ModDownloader;
 import com.maxjubayeryt.modbundle.utils.PrefManager;
@@ -303,6 +305,7 @@ public class MainActivity extends AppCompatActivity {
             updateFolderLabel();
             updateActiveInstanceLabel();
             instanceAdapter.setActiveInstancePath(path);
+            applyInstanceFilters(path);
             Toast.makeText(this, "Active: " + name, Toast.LENGTH_SHORT).show();
             // Stay on instances tab
         });
@@ -1203,7 +1206,8 @@ public class MainActivity extends AppCompatActivity {
         if (instanceUri != null) {
             downloader.downloadMod(newFile, instanceUri, currentInstalledType, null, getSelectedVersion(), getSelectedLoader(), callback);
         } else {
-            java.io.File instanceDir = prefs.getInstanceFile();
+            java.io.File instanceDir = getLegacyInstanceDir();
+            if (instanceDir == null) { progress.dismiss(); Toast.makeText(this, "No instance folder set", Toast.LENGTH_SHORT).show(); return; }
             java.io.File subDir = new java.io.File(instanceDir, currentInstalledType);
             downloader.downloadMod(newFile, subDir, null, getSelectedVersion(), getSelectedLoader(), callback);
         }
@@ -1289,6 +1293,20 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             }
+            // listFiles()/DocumentFile enumeration order isn't stable — it reflects filesystem/SAF
+            // directory order, which can (and does) change after a rename. Disabling/enabling a
+            // mod renames it (adds/removes ".disabled"), so without an explicit sort here the row
+            // jumps to wherever the provider now happens to list it. Sorting by filename keeps the
+            // list in the same order across refreshes regardless of enumeration order.
+            installedMods.sort((a, b) -> {
+                String nameA = (a instanceof androidx.documentfile.provider.DocumentFile)
+                        ? ((androidx.documentfile.provider.DocumentFile) a).getName() : ((java.io.File) a).getName();
+                String nameB = (b instanceof androidx.documentfile.provider.DocumentFile)
+                        ? ((androidx.documentfile.provider.DocumentFile) b).getName() : ((java.io.File) b).getName();
+                if (nameA == null) nameA = "";
+                if (nameB == null) nameB = "";
+                return nameA.compareToIgnoreCase(nameB);
+            });
             installedAdapter.notifyDataSetChanged();
             if (tvInstalledCount != null) tvInstalledCount.setText(installedMods.size() + " files");
             emptyInstalled.setVisibility(installedMods.isEmpty() ? View.VISIBLE : View.GONE);
@@ -1430,6 +1448,38 @@ public class MainActivity extends AppCompatActivity {
             .setMessage("Select your instance folder.")
             .setPositiveButton("Choose", (d, w) -> openFolderPicker())
             .setNegativeButton("Later", null).show();
+    }
+
+    /**
+     * Syncs the browse screen's loader/game-version spinners (and therefore search/update
+     * filtering) to whatever loader+version were saved for this instance, so switching
+     * instances doesn't leave Browse filtered against the previous instance's loader/MC
+     * version. Falls back to leaving the spinners untouched when the instance has no
+     * saved loader/version yet (e.g. it was never edited via "Edit Instance").
+     */
+    private void applyInstanceFilters(String path) {
+        String savedLoader = instanceNameStore.getLoader(path);
+        if (savedLoader != null && !savedLoader.isEmpty() && spinnerLoader != null && spinnerLoader.getAdapter() != null) {
+            for (int i = 0; i < spinnerLoader.getAdapter().getCount(); i++) {
+                if (savedLoader.equalsIgnoreCase(String.valueOf(spinnerLoader.getAdapter().getItem(i)))) {
+                    spinnerLoader.setSelection(i); // triggers filterListener -> saveFilters() + searchMods()
+                    break;
+                }
+            }
+        }
+
+        String savedVersion = instanceNameStore.getVersion(path);
+        if (savedVersion != null && !savedVersion.isEmpty()) {
+            api.getGameVersions(includeSnapshots, versions -> handler.post(() -> {
+                if (spinnerVersion == null || spinnerVersion.getAdapter() == null) return;
+                for (int i = 0; i < spinnerVersion.getAdapter().getCount(); i++) {
+                    if (savedVersion.equals(spinnerVersion.getAdapter().getItem(i))) {
+                        spinnerVersion.setSelection(i); // triggers filterListener -> saveFilters() + searchMods()
+                        break;
+                    }
+                }
+            }), err -> {});
+        }
     }
 
     private void saveFilters() { prefs.saveFilters(getSelectedVersion(), getSelectedLoader()); }

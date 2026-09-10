@@ -555,7 +555,7 @@
                 android:layout_marginBottom="8dp"
                 android:clickable="true"
                 android:focusable="true"
-                android:tag="https://discord.com/invite/r8wUtzMzUe">
+                android:tag="https://discord.gg/j8GTQv3YvY">
                 <ImageView
                     android:layout_width="22dp"
                     android:layout_height="22dp"
@@ -581,7 +581,7 @@
                 android:layout_marginBottom="8dp"
                 android:clickable="true"
                 android:focusable="true"
-                android:tag="https://github.com/CopperLauncher/">
+                android:tag="https://github.com/CopperLauncher/Copper-Android">
                 <ImageView
                     android:layout_width="22dp"
                     android:layout_height="22dp"
@@ -589,7 +589,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="GitHub — CopperLauncher"
+                    android:text="GitHub — Copper Launcher"
                     android:textColor="#DDDDDD"
                     android:textSize="13sp"
                     android:layout_marginStart="12dp"/>

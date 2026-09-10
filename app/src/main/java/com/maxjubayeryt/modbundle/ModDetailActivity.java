@@ -58,7 +58,6 @@ public class ModDetailActivity extends AppCompatActivity {
         source = getIntent().getStringExtra(EXTRA_SOURCE);
         gameVersion = getIntent().getStringExtra("game_version") != null ? getIntent().getStringExtra("game_version") : "";
         loader = getIntent().getStringExtra("loader") != null ? getIntent().getStringExtra("loader") : "";
-        boolean includeSnapshots = getIntent().getBooleanExtra("include_snapshots", false);
         
         if (modJson == null) { finish(); return; }
         try {
@@ -178,11 +177,12 @@ public class ModDetailActivity extends AppCompatActivity {
                             Toast.makeText(this, "No compatible versions found", Toast.LENGTH_SHORT).show();
                             return;
                         }
-                        List<ModVersion> filtered = new java.util.ArrayList<>();
-                        for (ModVersion v : versions) {
-                            String vType = v.versionType != null ? v.versionType : "release";
-                            if ("release".equals(vType) || includeSnapshots) filtered.add(v);
-                        }
+                        // Every content version type (release/beta/alpha) is always shown here —
+                        // that release-channel field on Modrinth versions is unrelated to
+                        // Minecraft *snapshot* game versions, so it must never be gated by the
+                        // "include snapshots" toggle. Snapshots only affect which Minecraft game
+                        // versions show up in the version spinner (see getGameVersions above).
+                        List<ModVersion> filtered = new java.util.ArrayList<>(versions);
                         VersionAdapter adapter = new VersionAdapter(filtered, (version, file) ->
                             confirmDependenciesAndStartDownload(version, file));
                         versionsRecycler.setAdapter(adapter);
