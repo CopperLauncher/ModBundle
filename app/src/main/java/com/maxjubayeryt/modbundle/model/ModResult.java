@@ -18,4 +18,9 @@ public class ModResult {
 
     // Set at runtime
     public boolean isInstalled = false;
+    // CurseForge-only: some mod authors disable third-party API downloads
+    // ("allowModDistribution" = false). The content still shows up in search/browse,
+    // but installing it has to go through the CF website instead of a direct download.
+    public boolean isRestricted = false;
+    public String pageUrl;
 }

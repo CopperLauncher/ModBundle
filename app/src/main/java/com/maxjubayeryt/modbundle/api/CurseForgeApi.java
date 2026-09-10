@@ -65,6 +65,19 @@ public class CurseForgeApi {
                         r.iconUrl = logo != null ? logo.get("thumbnailUrl").getAsString() : null;
                         r.downloads = mod.has("downloadCount") ? mod.get("downloadCount").getAsInt() : 0;
                         r.source = "curseforge";
+                        // "allowModDistribution" is null for most mods (meaning allowed) and only
+                        // explicitly false for the ones whose author opted out of third-party API
+                        // downloads. Gson maps a JSON null through as isJsonNull(), not a Java null
+                        // boolean, so it has to be checked before calling getAsBoolean().
+                        if (mod.has("allowModDistribution") && !mod.get("allowModDistribution").isJsonNull()) {
+                            r.isRestricted = !mod.get("allowModDistribution").getAsBoolean();
+                        }
+                        if (mod.has("links") && !mod.get("links").isJsonNull()) {
+                            JsonObject links = mod.getAsJsonObject("links");
+                            if (links.has("websiteUrl") && !links.get("websiteUrl").isJsonNull()) {
+                                r.pageUrl = links.get("websiteUrl").getAsString();
+                            }
+                        }
                         results.add(r);
                     }
                     onSuccess.onSuccess(results);

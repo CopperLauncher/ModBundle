@@ -133,19 +133,19 @@ public class ModDetailActivity extends AppCompatActivity {
                     handler.post(() -> {
                         if (progress != null) progress.setVisibility(View.GONE);
                         if (fileObj == null || !fileObj.has("id") || !fileObj.has("fileName")) {
-                            Toast.makeText(this, "No versions found", Toast.LENGTH_SHORT).show();
+                            showCurseForgeRestrictedDialog();
                             return;
                         }
                         String fileId = fileObj.get("id").getAsString();
                         String fileName = fileObj.get("fileName").getAsString();
                         if (fileId == null || fileId.isEmpty() || fileName == null || fileName.isEmpty()) {
-                            Toast.makeText(this, "No versions found", Toast.LENGTH_SHORT).show();
+                            showCurseForgeRestrictedDialog();
                             return;
                         }
                         cfApi.getDownloadUrl(mod.projectId, fileId, url -> {
                             handler.post(() -> {
                                 if (url == null || url.isEmpty()) {
-                                    Toast.makeText(this, "Unable to download file", Toast.LENGTH_SHORT).show();
+                                    showCurseForgeRestrictedDialog();
                                     return;
                                 }
                                 ModVersion fakeVersion = new ModVersion();
@@ -162,12 +162,15 @@ public class ModDetailActivity extends AppCompatActivity {
                                     (version, f) -> startDownload(version, f));
                                 versionsRecycler.setAdapter(adapter);
                             });
-                        }, err -> handler.post(() ->
-                            Toast.makeText(this, "CF Error: " + err, Toast.LENGTH_SHORT).show()));
+                        }, err -> handler.post(this::showCurseForgeRestrictedDialog));
                     });
                 }, error -> handler.post(() -> {
                     if (progress != null) progress.setVisibility(View.GONE);
-                    Toast.makeText(this, "Failed to load versions", Toast.LENGTH_SHORT).show();
+                    // A 403 here (as opposed to a network/parsing failure) almost always means
+                    // this mod has third-party downloads disabled — CF's files endpoint itself
+                    // refuses the request rather than returning files with a null downloadUrl.
+                    if (error != null && error.contains("403")) showCurseForgeRestrictedDialog();
+                    else Toast.makeText(this, "Failed to load versions", Toast.LENGTH_SHORT).show();
                 }));
             } else {
                 api.getVersions(mod.projectId, gameVersion, loader, versions -> {
@@ -193,6 +196,27 @@ public class ModDetailActivity extends AppCompatActivity {
                 }));
             }
         }
+    }
+
+    /**
+     * Some CurseForge mod/resourcepack/shaderpack authors disable third-party API
+     * downloads ("Allow third party download" off in their CF project settings) —
+     * their files still show up in search, but the download-url endpoint returns
+     * nothing for them. Ported from Copper-Android's own handling of this: instead
+     * of just failing, send the user to the mod's CurseForge page to download it
+     * manually from there.
+     */
+    private void showCurseForgeRestrictedDialog() {
+        String url = mod != null && mod.pageUrl != null && !mod.pageUrl.isEmpty()
+                ? mod.pageUrl
+                : "https://www.curseforge.com/minecraft/search?search=" + android.net.Uri.encode(mod != null ? mod.title : "");
+        new AlertDialog.Builder(this)
+                .setTitle("Download restricted")
+                .setMessage("The author of this content has disabled downloads through third-party apps like ModBundle. You can still get it from the CurseForge website.")
+                .setPositiveButton("Open CurseForge", (d, w) ->
+                        startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))))
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void startDownload(ModVersion version, ModVersion.VersionFile file) {

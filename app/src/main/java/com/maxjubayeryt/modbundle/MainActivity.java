@@ -958,7 +958,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void checkUpdates() {
-        if (!"mods".equals(currentInstalledType)) return;
         btnCheckUpdates.setEnabled(false);
         btnCheckUpdates.setText("Checking...");
         installedAdapter.getMetaCache().clear();
@@ -972,73 +971,59 @@ public class MainActivity extends AppCompatActivity {
         java.util.concurrent.atomic.AtomicInteger pending = new java.util.concurrent.atomic.AtomicInteger(modsCopy.size());
         java.util.concurrent.atomic.AtomicInteger updatesFound = new java.util.concurrent.atomic.AtomicInteger(0);
 
+        // Instance's stored loader/game-version take priority, falling back to whatever
+        // the Browse spinners currently have.
+        String iMcVer = "", iLoader = "";
+        android.net.Uri iUri = prefs.getInstanceUri();
+        if (iUri != null) {
+            String ipath = "file".equals(iUri.getScheme()) ? iUri.getPath() : iUri.toString();
+            if (ipath != null) { iLoader = instanceNameStore.getLoader(ipath); iMcVer = instanceNameStore.getVersion(ipath); }
+        }
+        if (iMcVer.isEmpty()) iMcVer = getSelectedVersion();
+        if (iLoader.isEmpty()) iLoader = getSelectedLoader();
+        final String checkVer = iMcVer;
+        final String checkLoad = iLoader;
+
+        com.maxjubayeryt.modbundle.utils.ContentUpdateChecker checker = new com.maxjubayeryt.modbundle.utils.ContentUpdateChecker();
+
         for (Object mod : modsCopy) {
             sBgExecutor.execute(() -> {
+                String fileName = (mod instanceof androidx.documentfile.provider.DocumentFile)
+                        ? ((androidx.documentfile.provider.DocumentFile) mod).getName() : ((java.io.File) mod).getName();
+                if (fileName != null && fileName.endsWith(".disabled")) {
+                    if (pending.decrementAndGet() <= 0) finishCheckUpdates(updatesFound.get());
+                    return;
+                }
+
+                // Hash-based lookup (SHA1 -> Modrinth, murmur2 -> CurseForge fallback) works
+                // identically for mods, resource packs, and shader packs — unlike the old
+                // ModMetadataParser-only approach, it doesn't depend on the file carrying its
+                // own embedded project id, which resource/shader packs never do. This is what
+                // makes update checking actually work for those two content types.
+                com.maxjubayeryt.modbundle.utils.ContentUpdateChecker.ResultCallback onResult = result -> {
+                    if (result != null && result.hasUpdate && fileName != null) {
+                        com.maxjubayeryt.modbundle.utils.ModMetadata meta = new com.maxjubayeryt.modbundle.utils.ModMetadata();
+                        meta.hasUpdate = true;
+                        meta.latestVersion = result.latestVersionName;
+                        meta.latestFileUrl = result.latestFileUrl;
+                        meta.latestFileName = result.latestFileName;
+                        updatesFound.incrementAndGet();
+                        handler.post(() -> {
+                            installedAdapter.getMetaCache().put(fileName, meta);
+                            scheduleMetaCacheRefresh();
+                        });
+                    }
+                    if (pending.decrementAndGet() <= 0) finishCheckUpdates(updatesFound.get());
+                };
+
                 try {
-                    com.maxjubayeryt.modbundle.utils.ModMetadata meta = (mod instanceof androidx.documentfile.provider.DocumentFile)
-                        ? com.maxjubayeryt.modbundle.utils.ModMetadataParser.parse(this, (androidx.documentfile.provider.DocumentFile) mod)
-                        : com.maxjubayeryt.modbundle.utils.ModMetadataParser.parse((java.io.File) mod);
-
-                    if (meta == null || meta.modId == null) {
-                        if (pending.decrementAndGet() <= 0) finishCheckUpdates(updatesFound.get());
-                        return;
+                    if (mod instanceof androidx.documentfile.provider.DocumentFile) {
+                        checker.check(this, (androidx.documentfile.provider.DocumentFile) mod, checkVer, checkLoad, onResult);
+                    } else {
+                        checker.check((java.io.File) mod, checkVer, checkLoad, onResult);
                     }
-                    final com.maxjubayeryt.modbundle.utils.ModMetadata finalMeta = meta;
-                    String fileName = (mod instanceof androidx.documentfile.provider.DocumentFile) ? ((androidx.documentfile.provider.DocumentFile) mod).getName() : ((java.io.File) mod).getName();
-
-                    // Use instance stored loader/version, fallback to spinner, then mod metadata
-                    String iMcVer = "", iLoader = "";
-                    android.net.Uri iUri = prefs.getInstanceUri();
-                    if (iUri != null) {
-                        String ipath = "file".equals(iUri.getScheme()) ? iUri.getPath() : iUri.toString();
-                        if (ipath != null) { iLoader = instanceNameStore.getLoader(ipath);
-                        iMcVer = instanceNameStore.getVersion(ipath); }
-                    }
-                    if (iMcVer.isEmpty()) iMcVer = getSelectedVersion();
-                    if (iLoader.isEmpty()) iLoader = getSelectedLoader();
-                    final String checkVer = iMcVer;
-                    final String checkLoad = iLoader;
-                    api.getVersions(finalMeta.modId, checkVer, checkLoad,
-                        versions -> {
-                            if (versions != null && !versions.isEmpty()) {
-                                // Find version matching instance loader+version strictly
-                                com.maxjubayeryt.modbundle.model.ModVersion latest = null;
-                                for (com.maxjubayeryt.modbundle.model.ModVersion v : versions) {
-                                    boolean lOk = !checkLoad.isEmpty() && v.loaders != null && v.loaders.contains(checkLoad);
-                                    boolean mOk = !checkVer.isEmpty() && v.gameVersions != null && v.gameVersions.contains(checkVer);
-                                    if (lOk && mOk) { latest = v; break; }
-                                }
-                                if (latest == null && !versions.isEmpty()) latest = versions.get(0);
-                                boolean alreadyLatest = false;
-                                if (latest.files != null) {
-                                    for (com.maxjubayeryt.modbundle.model.ModVersion.VersionFile vf : latest.files) {
-                                        if (vf.filename != null && vf.filename.equals(fileName)) { alreadyLatest = true; break; }
-                                    }
-                                }
-                                if (!alreadyLatest) {
-                                    finalMeta.hasUpdate = true;
-                                    finalMeta.latestVersion = latest.versionNumber;
-                                    com.maxjubayeryt.modbundle.model.ModVersion.VersionFile f = com.maxjubayeryt.modbundle.utils.ModDownloader.getPrimaryFile(latest);
-                                    if (f != null) { finalMeta.latestFileUrl = f.url; finalMeta.latestFileName = f.filename; }
-                                    updatesFound.incrementAndGet();
-                                }
-                            }
-                            // Results for dozens of mods can land within the same few
-                            // milliseconds (all requests fired near-simultaneously); calling
-                            // notifyDataSetChanged() once per result was what caused the
-                            // multi-second freeze right after "Check Updates" finished, since
-                            // that's N full-list rebinds stacked back to back. Results are
-                            // written straight into the cache here and the UI is refreshed
-                            // once via the debounced helper instead.
-                            handler.post(() -> {
-                                installedAdapter.getMetaCache().put(fileName, finalMeta);
-                                scheduleMetaCacheRefresh();
-                            });
-                            if (pending.decrementAndGet() <= 0) finishCheckUpdates(updatesFound.get());
-                        },
-                        error -> { if (pending.decrementAndGet() <= 0) finishCheckUpdates(updatesFound.get()); });
                 } catch (Exception e) { if (pending.decrementAndGet() <= 0) finishCheckUpdates(updatesFound.get()); }
-            }).start();
+            });
         }
     }
 
