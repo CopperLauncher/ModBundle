@@ -109,10 +109,26 @@ public class CurseForgeApi {
     public void getLatestFile(String modId, String gameVersion, String loader,
                               ModrinthApi.OnSuccess<JsonObject> onSuccess,
                               ModrinthApi.OnError onError) {
+        getFiles(modId, gameVersion, loader, files -> {
+            if (files == null || files.isEmpty()) { onError.onError("No files found"); return; }
+            onSuccess.onSuccess(files.get(0));
+        }, onError);
+    }
+
+    /**
+     * Returns every matching file for a CF mod/resourcepack/shaderpack, newest first —
+     * unlike {@link #getLatestFile}, which only ever returns the single newest one. That
+     * was the whole reason CF content only ever showed a single install option: the
+     * version-picker dialog was built from one file instead of the full list this
+     * returns.
+     */
+    public void getFiles(String modId, String gameVersion, String loader,
+                         ModrinthApi.OnSuccess<java.util.List<JsonObject>> onSuccess,
+                         ModrinthApi.OnError onError) {
         if (!ENABLED) { onError.onError("CurseForge support unavailable"); return; }
         new Thread(() -> {
             try {
-                StringBuilder url = new StringBuilder(BASE + "/mods/" + modId + "/files?pageSize=10");
+                StringBuilder url = new StringBuilder(BASE + "/mods/" + modId + "/files?pageSize=20");
                 if (gameVersion != null && !gameVersion.isEmpty() && !gameVersion.equals("Any"))
                     url.append("&gameVersion=").append(encode(gameVersion));
                 if (loader != null && !loader.isEmpty() && !loader.equals("Any")) {
@@ -131,8 +147,9 @@ public class CurseForgeApi {
                     if (!response.isSuccessful()) { onError.onError("CF Error: " + response.code()); return; }
                     JsonObject json = gson.fromJson(response.body().string(), JsonObject.class);
                     JsonArray files = json.getAsJsonArray("data");
-                    if (files.size() == 0) { onError.onError("No files found"); return; }
-                    onSuccess.onSuccess(files.get(0).getAsJsonObject());
+                    java.util.List<JsonObject> result = new ArrayList<>();
+                    for (int i = 0; i < files.size(); i++) result.add(files.get(i).getAsJsonObject());
+                    onSuccess.onSuccess(result);
                 }
             } catch (Exception e) { onError.onError(e.getMessage()); }
         }).start();

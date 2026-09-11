@@ -198,6 +198,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupFilters() {
+        // An active instance's own saved loader/version (set via "Edit Instance") takes
+        // priority over the generic last-used Browse filter for the *initial* selection.
+        // This only ever reads from the instance — Browse's spinners changing afterward
+        // never write back into Instance Manager, that only happens through the Edit
+        // Instance dialog itself (instanceNameStore.setLoader/setVersion), so switching
+        // filters while browsing can't clobber what's saved for the instance.
+        String instancePath = getActiveInstancePath();
+        String instanceLoader = instancePath != null ? instanceNameStore.getLoader(instancePath) : "";
+        String instanceVer = instancePath != null ? instanceNameStore.getVersion(instancePath) : "";
+        String initialLoader = !instanceLoader.isEmpty() ? instanceLoader : prefs.getLoader();
+        String initialVersion = !instanceVer.isEmpty() ? instanceVer : prefs.getGameVersion();
+
         api.getGameVersions(includeSnapshots, versions -> {
             String[] versionArray = versions.toArray(new String[0]);
             runOnUiThread(() -> {
@@ -205,9 +217,8 @@ public class MainActivity extends AppCompatActivity {
                         android.R.layout.simple_spinner_item, versionArray);
                 vAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
                 spinnerVersion.setAdapter(vAdapter);
-                String savedVer = prefs.getGameVersion();
-                if (!savedVer.isEmpty()) {
-                    int idx = versions.indexOf(savedVer);
+                if (!initialVersion.isEmpty()) {
+                    int idx = versions.indexOf(initialVersion);
                     if (idx >= 0) spinnerVersion.setSelection(idx);
                 }
                 if (prefs.hasModsFolder()) {
@@ -223,9 +234,8 @@ public class MainActivity extends AppCompatActivity {
         lAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerLoader.setAdapter(lAdapter);
 
-        String savedLoader = prefs.getLoader();
-        if (!savedLoader.isEmpty()) {
-            int idx = Arrays.asList(LOADERS).indexOf(savedLoader);
+        if (!initialLoader.isEmpty()) {
+            int idx = Arrays.asList(LOADERS).indexOf(initialLoader);
             if (idx >= 0) spinnerLoader.setSelection(idx);
         }
 
@@ -514,6 +524,20 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         return uri;
+    }
+
+    /**
+     * Resolves the currently-active instance's storage path, the same way
+     * setupInstances() does for the instance list's "active" highlight — pulled out
+     * here so Browse's initial filter setup can use it too, without depending on
+     * setupInstances() having already populated the instance list UI.
+     */
+    private String getActiveInstancePath() {
+        Uri activeUri = prefs.getInstanceUri();
+        if (activeUri == null) return null;
+        Uri preferred = resolvePreferredInstanceUri(activeUri);
+        if (preferred == null) return null;
+        return "file".equals(preferred.getScheme()) ? preferred.getPath() : activeUri.toString();
     }
 
     private void addInstanceFromUri(Uri uri) {

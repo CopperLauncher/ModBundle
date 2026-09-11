@@ -129,40 +129,54 @@ public class ModDetailActivity extends AppCompatActivity {
             if (progress != null) progress.setVisibility(View.VISIBLE);
 
             if ("curseforge".equals(source)) {
-                cfApi.getLatestFile(mod.projectId, "", "", fileObj -> {
+                cfApi.getFiles(mod.projectId, "", "", files -> {
                     handler.post(() -> {
                         if (progress != null) progress.setVisibility(View.GONE);
-                        if (fileObj == null || !fileObj.has("id") || !fileObj.has("fileName")) {
+                        if (files == null || files.isEmpty()) {
                             showCurseForgeRestrictedDialog();
                             return;
                         }
-                        String fileId = fileObj.get("id").getAsString();
-                        String fileName = fileObj.get("fileName").getAsString();
-                        if (fileId == null || fileId.isEmpty() || fileName == null || fileName.isEmpty()) {
+                        // Every returned file becomes its own entry instead of only ever
+                        // showing the single newest one — that was the whole reason CF
+                        // content only ever had one version to pick from.
+                        java.util.List<ModVersion> versionList = new java.util.ArrayList<>();
+                        for (com.google.gson.JsonObject fileObj : files) {
+                            if (!fileObj.has("id") || !fileObj.has("fileName")) continue;
+                            String fileId = fileObj.get("id").getAsString();
+                            String fileName = fileObj.get("fileName").getAsString();
+                            if (fileId == null || fileId.isEmpty() || fileName == null || fileName.isEmpty()) continue;
+                            ModVersion v = new ModVersion();
+                            v.id = fileId; // stashed so the click handler below can resolve this exact file's download url
+                            v.versionNumber = fileName;
+                            v.versionType = "release";
+                            v.dependencies = new java.util.ArrayList<>();
+                            ModVersion.VersionFile file = new ModVersion.VersionFile();
+                            file.filename = fileName;
+                            file.primary = true;
+                            // file.url is intentionally left unset here: CF only resolves a
+                            // real download link one file at a time, so it's fetched lazily
+                            // below for whichever version the user actually taps, instead of
+                            // firing one request per file up front.
+                            v.files = java.util.Arrays.asList(file);
+                            versionList.add(v);
+                        }
+                        if (versionList.isEmpty()) {
                             showCurseForgeRestrictedDialog();
                             return;
                         }
-                        cfApi.getDownloadUrl(mod.projectId, fileId, url -> {
-                            handler.post(() -> {
-                                if (url == null || url.isEmpty()) {
-                                    showCurseForgeRestrictedDialog();
-                                    return;
-                                }
-                                ModVersion fakeVersion = new ModVersion();
-                                fakeVersion.versionNumber = fileName;
-                                fakeVersion.versionType = "release";
-                                fakeVersion.dependencies = new java.util.ArrayList<>();
-                                ModVersion.VersionFile file = new ModVersion.VersionFile();
+                        VersionAdapter adapter = new VersionAdapter(versionList, (version, file) -> {
+                            ProgressDialog resolving = new ProgressDialog(this);
+                            resolving.setMessage("Resolving download link\u2026");
+                            resolving.setCancelable(true);
+                            resolving.show();
+                            cfApi.getDownloadUrl(mod.projectId, version.id, url -> handler.post(() -> {
+                                resolving.dismiss();
+                                if (url == null || url.isEmpty()) { showCurseForgeRestrictedDialog(); return; }
                                 file.url = url;
-                                file.filename = fileName;
-                                file.primary = true;
-                                fakeVersion.files = java.util.Arrays.asList(file);
-                                VersionAdapter adapter = new VersionAdapter(
-                                    java.util.Arrays.asList(fakeVersion),
-                                    (version, f) -> startDownload(version, f));
-                                versionsRecycler.setAdapter(adapter);
-                            });
-                        }, err -> handler.post(this::showCurseForgeRestrictedDialog));
+                                startDownload(version, file);
+                            }), err -> handler.post(() -> { resolving.dismiss(); showCurseForgeRestrictedDialog(); }));
+                        });
+                        versionsRecycler.setAdapter(adapter);
                     });
                 }, error -> handler.post(() -> {
                     if (progress != null) progress.setVisibility(View.GONE);
