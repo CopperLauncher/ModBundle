@@ -201,6 +201,15 @@ public class ModIconLoader {
         int res = type == FileType.SHADER ? R.drawable.ic_shader_default
                 : type == FileType.RESOURCEPACK ? R.drawable.ic_respack_default
                 : R.drawable.ic_mod_default;
-        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> target.setImageResource(res));
+        // These vectors ship with a neutral fillColor; tinting them here with the resolved
+        // theme color (rather than baking a fixed hex into the vector) is what makes them
+        // follow Material You dynamic color at runtime, the same as everything else tinted
+        // via ?attr/colorPrimary in the layouts.
+        int tint = com.google.android.material.color.MaterialColors.getColor(
+                target, com.google.android.material.R.attr.colorPrimary);
+        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+            target.setImageResource(res);
+            target.setColorFilter(tint);
+        });
     }
 }

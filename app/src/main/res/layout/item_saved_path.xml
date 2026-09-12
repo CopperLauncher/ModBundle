@@ -16,14 +16,14 @@
             android:id="@+id/path_name"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="13sp"
             android:textStyle="bold"/>
         <TextView
             android:id="@+id/path_uri"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="#888888"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="10sp"
             android:maxLines="1"
             android:ellipsize="middle"
@@ -35,8 +35,8 @@
         android:layout_height="wrap_content"
         android:text="Use"
         android:textSize="11sp"
-        android:textColor="#FFFFFF"
-        android:backgroundTint="#9649b8"
+        android:textColor="?attr/colorOnSurface"
+        android:backgroundTint="?attr/colorPrimary"
         android:layout_marginStart="6dp"
         style="@style/Widget.MaterialComponents.Button"/>
     <Button
@@ -45,8 +45,8 @@
         android:layout_height="wrap_content"
         android:text="✕"
         android:textSize="11sp"
-        android:textColor="#FFFFFF"
-        android:backgroundTint="#663333"
+        android:textColor="?attr/colorOnSurface"
+        android:backgroundTint="?attr/colorErrorContainer"
         android:layout_marginStart="4dp"
         style="@style/Widget.MaterialComponents.Button"/>
 </LinearLayout>

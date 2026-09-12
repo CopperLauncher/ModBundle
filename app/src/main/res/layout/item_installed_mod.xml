@@ -15,7 +15,7 @@
         android:id="@+id/mod_checkbox"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:buttonTint="#9649b8"
+        android:buttonTint="?attr/colorPrimary"
         android:layout_marginEnd="8dp"
         android:visibility="gone"/>
 
@@ -38,7 +38,7 @@
             android:id="@+id/mod_filename"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="16sp"
             android:maxLines="1"
             android:ellipsize="middle"/>
@@ -53,7 +53,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text=".jar"
-                android:textColor="#2D7D46"
+                android:textColor="@color/md_success"
                 android:textSize="12sp"
                 android:background="@drawable/bg_mod_card"
                 android:paddingHorizontal="8dp"
@@ -77,7 +77,7 @@
         android:padding="10dp"
         android:src="@drawable/ic_swap_horiz"
         android:background="?attr/selectableItemBackgroundBorderless"
-        android:tint="#9649b8"
+        android:tint="?attr/colorPrimary"
         android:contentDescription="Switch version"
         android:layout_marginEnd="4dp"/>
 
@@ -89,7 +89,7 @@
         android:padding="10dp"
         android:src="@drawable/ic_update"
         android:background="?attr/selectableItemBackgroundBorderless"
-        android:tint="#9649b8"
+        android:tint="?attr/colorPrimary"
         android:contentDescription="Update mod"
         android:visibility="gone"
         android:layout_marginEnd="4dp"/>
@@ -102,7 +102,7 @@
         android:padding="10dp"
         android:src="@drawable/ic_pause"
         android:background="?attr/selectableItemBackgroundBorderless"
-        android:tint="#888888"
+        android:tint="?attr/colorOnSurfaceVariant"
         android:contentDescription="Disable mod"
         android:layout_marginEnd="4dp"/>
 
@@ -114,6 +114,6 @@
         android:padding="10dp"
         android:src="@drawable/ic_delete"
         android:background="?attr/selectableItemBackgroundBorderless"
-        android:tint="#E53935"
+        android:tint="?attr/colorError"
         android:contentDescription="Delete mod"/>
 </LinearLayout>

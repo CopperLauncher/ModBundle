@@ -1,21 +1,62 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Amethyst theme colors -->
-    <color name="background_app">#181818</color>
-    <color name="background_status_bar">#242424</color>
-    <color name="background_bottom_bar">#232323</color>
-    <color name="background_overlay">#464646</color>
-    <color name="minebutton_color">#9649b8</color>
-    <color name="primary_text">#FFFFFF</color>
-    <color name="secondary_text">#B2B2B2</color>
-    <color name="divider">#464646</color>
+    <!--
+        Material 3 color roles, light scheme (seed hue ~283°, the app's original purple).
+        Only used as a fallback for pre-Android 12 devices or if night mode is ever turned
+        off — ModBundleApp forces dark mode today, so values-night/colors.xml is what's
+        actually shown, and both are overridden at runtime by Material You dynamic color
+        on Android 12+ (see DynamicColors.applyToActivitiesIfAvailable in ModBundleApp).
+    -->
+    <color name="md_primary">#7C4396</color>
+    <color name="md_on_primary">#FFFFFF</color>
+    <color name="md_primary_container">#F3DAFF</color>
+    <color name="md_on_primary_container">#300D45</color>
 
-    <!-- Legacy copper aliases mapped to amethyst -->
-    <color name="colorPrimary">#9649b8</color>
-    <color name="colorPrimaryDark">#181818</color>
-    <color name="colorAccent">#9649b8</color>
-    <color name="copper">#9649b8</color>
-    <color name="copper_dark">#7a3a99</color>
-    <color name="surface">#242424</color>
-    <color name="card_bg">#242424</color>
+    <color name="md_secondary">#665A6F</color>
+    <color name="md_on_secondary">#FFFFFF</color>
+    <color name="md_secondary_container">#EEDCF7</color>
+    <color name="md_on_secondary_container">#221828</color>
+
+    <color name="md_tertiary">#7F5262</color>
+    <color name="md_on_tertiary">#FFFFFF</color>
+    <color name="md_tertiary_container">#FFD9E3</color>
+    <color name="md_on_tertiary_container">#33101D</color>
+
+    <color name="md_error">#BA1A1A</color>
+    <color name="md_on_error">#FFFFFF</color>
+    <color name="md_error_container">#FFDAD6</color>
+    <color name="md_on_error_container">#410002</color>
+
+    <color name="md_background">#FFFBFF</color>
+    <color name="md_on_background">#1D1A1F</color>
+    <color name="md_surface">#FFFBFF</color>
+    <color name="md_on_surface">#1D1A1F</color>
+    <color name="md_surface_variant">#E9DFEA</color>
+    <color name="md_on_surface_variant">#4A454E</color>
+    <color name="md_surface_container">#F3EDF4</color>
+    <color name="md_surface_container_high">#ECE6ED</color>
+    <color name="md_outline">#7B757F</color>
+    <color name="md_outline_variant">#CBC4CF</color>
+    <!-- Not a standard M3 role — kept as a distinct "content is a valid file type" green
+         rather than forcing it into tertiary/error, which would muddy those roles' meaning. -->
+    <color name="md_success">#2D7D46</color>
+
+    <!-- Legacy names kept as aliases so any code/layout still referencing them by name
+         doesn't break; they now point at the matching M3 role instead of a flat hardcoded
+         hex. Prefer ?attr/colorX (themes.xml) over these in new/edited layouts. -->
+    <color name="colorPrimary">@color/md_primary</color>
+    <color name="colorPrimaryDark">@color/md_surface</color>
+    <color name="colorAccent">@color/md_primary</color>
+    <color name="background_app">@color/md_surface</color>
+    <color name="background_status_bar">@color/md_surface</color>
+    <color name="background_bottom_bar">@color/md_surface_container</color>
+    <color name="background_overlay">@color/md_surface_variant</color>
+    <color name="minebutton_color">@color/md_primary</color>
+    <color name="primary_text">@color/md_on_surface</color>
+    <color name="secondary_text">@color/md_on_surface_variant</color>
+    <color name="divider">@color/md_outline_variant</color>
+    <color name="copper">@color/md_primary</color>
+    <color name="copper_dark">@color/md_primary_container</color>
+    <color name="surface">@color/md_surface</color>
+    <color name="card_bg">@color/md_surface_container</color>
 </resources>

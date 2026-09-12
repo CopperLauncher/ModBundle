@@ -4,13 +4,13 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#181818">
+    android:background="?attr/colorSurface">
 
     <!-- App Bar -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:background="#242424"
+        android:background="?attr/colorSurfaceContainer"
         android:gravity="center_vertical"
         android:paddingHorizontal="16dp"
         android:elevation="4dp"
@@ -30,7 +30,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="ModBundle"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="20sp"
             android:textStyle="bold"
             android:fontFamily="sans-serif-medium"/>
@@ -59,7 +59,7 @@
                 android:paddingHorizontal="12dp"
                 android:paddingTop="10dp"
                 android:paddingBottom="4dp"
-                android:background="#242424">
+                android:background="?attr/colorSurfaceContainer">
                 <Button
                     android:id="@+id/btn_modrinth"
                     android:layout_width="0dp"
@@ -67,8 +67,8 @@
                     android:layout_weight="1"
                     android:text="Modrinth"
                     android:textSize="13sp"
-                    android:backgroundTint="#9649b8"
-                    android:textColor="#FFFFFF"
+                    android:backgroundTint="?attr/colorPrimary"
+                    android:textColor="?attr/colorOnSurface"
                     android:layout_marginEnd="4dp"
                     style="@style/Widget.MaterialComponents.Button"/>
                 <Button
@@ -78,8 +78,8 @@
                     android:layout_weight="1"
                     android:text="CurseForge"
                     android:textSize="13sp"
-                    android:backgroundTint="#242424"
-                    android:textColor="#AAAAAA"
+                    android:backgroundTint="?attr/colorSurfaceContainer"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:layout_marginStart="4dp"
                     style="@style/Widget.MaterialComponents.Button"/>
             </LinearLayout>
@@ -90,7 +90,7 @@
                 android:orientation="horizontal"
                 android:paddingHorizontal="12dp"
                 android:paddingBottom="4dp"
-                android:background="#242424">
+                android:background="?attr/colorSurfaceContainer">
                 <Button
                     android:id="@+id/btn_type_mods"
                     android:layout_width="0dp"
@@ -98,8 +98,8 @@
                     android:layout_weight="1"
                     android:text="Mods"
                     android:textSize="11sp"
-                    android:backgroundTint="#9649b8"
-                    android:textColor="#FFFFFF"
+                    android:backgroundTint="?attr/colorPrimary"
+                    android:textColor="?attr/colorOnSurface"
                     android:layout_marginEnd="3dp"
                     style="@style/Widget.MaterialComponents.Button"/>
                 <Button
@@ -109,8 +109,8 @@
                     android:layout_weight="1"
                     android:text="Res Packs"
                     android:textSize="11sp"
-                    android:backgroundTint="#242424"
-                    android:textColor="#AAAAAA"
+                    android:backgroundTint="?attr/colorSurfaceContainer"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:layout_marginEnd="3dp"
                     style="@style/Widget.MaterialComponents.Button"/>
                 <Button
@@ -120,8 +120,8 @@
                     android:layout_weight="1"
                     android:text="Shaders"
                     android:textSize="11sp"
-                    android:backgroundTint="#242424"
-                    android:textColor="#AAAAAA"
+                    android:backgroundTint="?attr/colorSurfaceContainer"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     style="@style/Widget.MaterialComponents.Button"/>
             </LinearLayout>
             <!-- Search Bar -->
@@ -132,7 +132,7 @@
                 android:paddingHorizontal="12dp"
                 android:paddingTop="6dp"
                 android:paddingBottom="6dp"
-                android:background="#242424">
+                android:background="?attr/colorSurfaceContainer">
 
                 <EditText
                     android:id="@+id/search_input"
@@ -140,8 +140,8 @@
                     android:layout_height="42dp"
                     android:layout_weight="1"
                     android:hint="Search mods…"
-                    android:textColorHint="#888888"
-                    android:textColor="#FFFFFF"
+                    android:textColorHint="?attr/colorOnSurfaceVariant"
+                    android:textColor="?attr/colorOnSurface"
                     android:background="@drawable/bg_search"
                     android:paddingHorizontal="14dp"
                     android:singleLine="true"
@@ -156,16 +156,16 @@
                 android:orientation="horizontal"
                 android:paddingHorizontal="12dp"
                 android:paddingBottom="8dp"
-                android:background="#242424">
+                android:background="?attr/colorSurfaceContainer">
 
                 <CheckBox
                     android:id="@+id/btn_snapshots"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Include Snapshots"
-                    android:textColor="#AAAAAA"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="11sp"
-                    android:buttonTint="#9649b8"
+                    android:buttonTint="?attr/colorPrimary"
                     android:checked="false"
                     android:layout_marginEnd="4dp"/>
                 <Spinner
@@ -175,7 +175,7 @@
                     android:layout_weight="1"
                     android:layout_marginEnd="8dp"
                     android:background="@drawable/bg_spinner"
-                    android:popupBackground="#242424"
+                    android:popupBackground="?attr/colorSurfaceContainer"
                     android:spinnerMode="dropdown"/>
 
                 <Spinner
@@ -184,7 +184,7 @@
                     android:layout_height="38dp"
                     android:layout_weight="1"
                     android:background="@drawable/bg_spinner"
-                    android:popupBackground="#242424"
+                    android:popupBackground="?attr/colorSurfaceContainer"
                     android:spinnerMode="dropdown"/>
             </LinearLayout>
 
@@ -194,7 +194,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="3dp"
                 android:indeterminate="true"
-                android:indeterminateTint="#9649b8"
+                android:indeterminateTint="?attr/colorPrimary"
                 style="@style/Widget.AppCompat.ProgressBar.Horizontal"
                 android:visibility="gone"/>
 
@@ -232,14 +232,14 @@
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
                 android:orientation="horizontal"
-                android:background="#242424">
+                android:background="?attr/colorSurfaceContainer">
                 <TextView
                     android:id="@+id/installed_tab_mods"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
                     android:text="Mods"
-                    android:textColor="#9649b8"
+                    android:textColor="?attr/colorPrimary"
                     android:textSize="13sp"
                     android:textStyle="bold"
                     android:gravity="center"/>
@@ -249,7 +249,7 @@
                     android:layout_height="match_parent"
                     android:layout_weight="1"
                     android:text="Shaders"
-                    android:textColor="#888888"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="13sp"
                     android:gravity="center"/>
                 <TextView
@@ -258,14 +258,14 @@
                     android:layout_height="match_parent"
                     android:layout_weight="1"
                     android:text="Res Packs"
-                    android:textColor="#888888"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="13sp"
                     android:gravity="center"/>
             </LinearLayout>
             <View
                 android:layout_width="match_parent"
                 android:layout_height="2dp"
-                android:background="#9649b8"/>
+                android:background="?attr/colorPrimary"/>
             <!-- Toolbar row 1: file count + check updates -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -281,16 +281,16 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="0 files"
-                    android:textColor="#888888"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="12sp"/>
                 <Button
                     android:id="@+id/btn_check_updates"
                     android:layout_width="wrap_content"
                     android:layout_height="30dp"
                     android:text="Check Updates"
-                    android:textColor="#9649b8"
+                    android:textColor="?attr/colorPrimary"
                     android:textSize="11sp"
-                    android:backgroundTint="#242424"
+                    android:backgroundTint="?attr/colorSurfaceContainer"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"/>
             </LinearLayout>
@@ -338,7 +338,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Settings"
-                android:textColor="#FFFFFF"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="22sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="24dp"/>
@@ -349,7 +349,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Active Instance"
-                android:textColor="#BBBBBB"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="13sp"
                 android:layout_marginBottom="6dp"/>
             <TextView
@@ -357,7 +357,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="No instance selected"
-                android:textColor="#888888"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="11sp"
                 android:background="@drawable/bg_search"
                 android:padding="12dp"
@@ -366,7 +366,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Select an instance from the Instances tab."
-                android:textColor="#555555"
+                android:textColor="?attr/colorOutline"
                 android:textSize="11sp"
                 android:layout_marginBottom="12dp"/>
             <Button
@@ -374,8 +374,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Pick Instance Manually"
-                android:textColor="#FFFFFF"
-                android:backgroundTint="#9649b8"
+                android:textColor="?attr/colorOnSurface"
+                android:backgroundTint="?attr/colorPrimary"
                 android:visibility="gone"/>
 
             <View
@@ -389,7 +389,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="About"
-                android:textColor="#BBBBBB"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="13sp"
                 android:layout_marginBottom="12dp"/>
 
@@ -414,7 +414,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="YouTube"
-                    android:textColor="#DDDDDD"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="13sp"
                     android:layout_marginStart="12dp"/>
             </LinearLayout>
@@ -440,7 +440,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="GitHub — ModBundle"
-                    android:textColor="#DDDDDD"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="13sp"
                     android:layout_marginStart="12dp"/>
             </LinearLayout>
@@ -466,7 +466,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Ko-fi"
-                    android:textColor="#DDDDDD"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="13sp"
                     android:layout_marginStart="12dp"/>
             </LinearLayout>
@@ -492,7 +492,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Patreon"
-                    android:textColor="#DDDDDD"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="13sp"
                     android:layout_marginStart="12dp"/>
             </LinearLayout>
@@ -518,7 +518,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Discord"
-                    android:textColor="#DDDDDD"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="13sp"
                     android:layout_marginStart="12dp"/>
             </LinearLayout>
@@ -544,7 +544,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="GitHub — Copper Launcher"
-                    android:textColor="#DDDDDD"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="13sp"
                     android:layout_marginStart="12dp"/>
             </LinearLayout>
@@ -570,7 +570,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Modrinth — MaxJubayerYT"
-                    android:textColor="#DDDDDD"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="13sp"
                     android:layout_marginStart="12dp"/>
             </LinearLayout>
@@ -593,8 +593,8 @@
         android:id="@+id/bottom_nav"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#242424"
-        app:itemTextColor="#AAAAAA"
+        android:background="?attr/colorSurfaceContainer"
+        app:itemTextColor="?attr/colorOnSurfaceVariant"
         app:itemIconTint="@drawable/bottom_nav_tint"
         app:menu="@menu/bottom_nav_menu"/>
 

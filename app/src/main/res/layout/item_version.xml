@@ -24,7 +24,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:textColor="#FFFFFF"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="14sp"
                 android:textStyle="bold"
                 android:maxLines="1"
@@ -49,13 +49,13 @@
                 android:id="@+id/version_game_versions"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="#9649b8"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="11sp"/>
             <TextView
                 android:id="@+id/version_loaders"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="#888888"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="11sp"
                 android:layout_marginStart="8dp"/>
             <TextView
@@ -63,7 +63,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:textColor="#666666"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="11sp"
                 android:gravity="end"/>
         </LinearLayout>
@@ -75,8 +75,8 @@
         android:layout_height="36dp"
         android:layout_marginStart="8dp"
         android:text="Download"
-        android:textColor="#FFFFFF"
+        android:textColor="?attr/colorOnSurface"
         android:textSize="12sp"
-        android:backgroundTint="#9649b8"
+        android:backgroundTint="?attr/colorPrimary"
         android:paddingHorizontal="12dp"/>
 </LinearLayout>
