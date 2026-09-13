@@ -96,7 +96,7 @@ public class CrashActivity extends Activity {
         });
         LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        copyParams.marginStart = dp(12);
+        copyParams.setMarginStart(dp(12));
         buttonRow.addView(copyButton, copyParams);
 
         setContentView(root);
