@@ -24,20 +24,27 @@ public class ThemeManager {
 
     /** Call at the very top of onCreate(), before setContentView(). */
     public static void apply(Activity activity) {
-        PrefManager prefs = new PrefManager(activity);
-        boolean wantsDynamic = prefs.getUseDynamicColor();
-        boolean dynamicAvailable = DynamicColors.isDynamicColorAvailable();
+        // Defensive: a resource-resolution problem in here would otherwise take the whole
+        // app down before a single screen renders, which is strictly worse than just
+        // falling back to the default AppTheme colors for one launch.
+        try {
+            PrefManager prefs = new PrefManager(activity);
+            boolean wantsDynamic = prefs.getUseDynamicColor();
+            boolean dynamicAvailable = DynamicColors.isDynamicColorAvailable();
 
-        if (wantsDynamic && dynamicAvailable) {
-            DynamicColors.applyToActivityIfAvailable(activity);
-            return;
-        }
+            if (wantsDynamic && dynamicAvailable) {
+                DynamicColors.applyToActivityIfAvailable(activity);
+                return;
+            }
 
-        int preset = prefs.getColorPreset();
-        int overlay = (preset >= 0 && preset < PRESET_OVERLAYS.length) ? PRESET_OVERLAYS[preset] : 0;
-        if (overlay != 0) {
-            activity.getTheme().applyStyle(overlay, true);
+            int preset = prefs.getColorPreset();
+            int overlay = (preset >= 0 && preset < PRESET_OVERLAYS.length) ? PRESET_OVERLAYS[preset] : 0;
+            if (overlay != 0) {
+                activity.getTheme().applyStyle(overlay, true);
+            }
+            // preset 0 (Purple) needs nothing extra — it's already what AppTheme defines.
+        } catch (Exception e) {
+            android.util.Log.e("ThemeManager", "Failed to apply color theme, falling back to default", e);
         }
-        // preset 0 (Purple) needs nothing extra — it's already what AppTheme defines.
     }
 }

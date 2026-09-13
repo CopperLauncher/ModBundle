@@ -33,6 +33,11 @@
         </activity>
 
             <activity android:name=".ModDetailActivity" android:theme="@style/AppTheme"/>
+
+        <activity
+            android:name=".CrashActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Material.NoActionBar"/>
     </application>
 
 </manifest>
