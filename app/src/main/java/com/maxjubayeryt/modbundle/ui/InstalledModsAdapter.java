@@ -119,7 +119,7 @@ public class InstalledModsAdapter extends RecyclerView.Adapter<InstalledModsAdap
         boolean isDisabled = name.endsWith(".disabled");
         String ext = isDisabled ? ".disabled" : name.endsWith(".jar") ? ".jar" : ".zip";
         holder.typeBadge.setText(ext);
-        holder.typeBadge.setTextColor(isDisabled ? 0xFF888888 : 0xFF2D7D46);
+        holder.typeBadge.setTextColor(isDisabled ? com.maxjubayeryt.modbundle.utils.ThemeColors.onSurfaceVariant(holder.typeBadge) : com.maxjubayeryt.modbundle.utils.ThemeColors.success(holder.typeBadge));
         holder.itemView.setAlpha(isDisabled ? 0.5f : 1f);
 
         // Update badge
@@ -134,7 +134,7 @@ public class InstalledModsAdapter extends RecyclerView.Adapter<InstalledModsAdap
         // Disable button
         holder.btnDisable.setVisibility(showDisable ? View.VISIBLE : View.GONE);
         holder.btnDisable.setImageResource(isDisabled ? R.drawable.ic_play : R.drawable.ic_pause);
-        holder.btnDisable.setColorFilter(isDisabled ? 0xFF4CAF50 : 0xFF888888);
+        holder.btnDisable.setColorFilter(isDisabled ? com.maxjubayeryt.modbundle.utils.ThemeColors.primary(holder.btnDisable) : com.maxjubayeryt.modbundle.utils.ThemeColors.onSurfaceVariant(holder.btnDisable));
         holder.btnDisable.setOnClickListener(v -> { if (disableListener != null) disableListener.onDisable(modRef); });
 
         holder.btnDelete.setOnClickListener(v -> deleteListener.onDelete(modRef));

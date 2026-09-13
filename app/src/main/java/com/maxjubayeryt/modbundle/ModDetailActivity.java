@@ -23,7 +23,6 @@ import com.maxjubayeryt.modbundle.model.ModVersion;
 import com.maxjubayeryt.modbundle.ui.VersionAdapter;
 import com.maxjubayeryt.modbundle.utils.ModDownloader;
 import com.maxjubayeryt.modbundle.utils.PrefManager;
-import android.app.ProgressDialog;
 import android.os.Handler;
 import android.os.Looper;
 import java.util.List;
@@ -104,8 +103,8 @@ public class ModDetailActivity extends AppCompatActivity {
                 Chip chip = new Chip(this);
                 chip.setText(cat);
                 chip.setChipBackgroundColorResource(android.R.color.transparent);
-                chip.setTextColor(0xFF9649b8);
-                chip.setChipStrokeColor(android.content.res.ColorStateList.valueOf(0xFF9649b8));
+                chip.setTextColor(com.maxjubayeryt.modbundle.utils.ThemeColors.primary(chip));
+                chip.setChipStrokeColor(android.content.res.ColorStateList.valueOf(com.maxjubayeryt.modbundle.utils.ThemeColors.primary(chip)));
                 chip.setChipStrokeWidth(1f);
                 chip.setClickable(false);
                 chipGroup.addView(chip);
@@ -165,7 +164,7 @@ public class ModDetailActivity extends AppCompatActivity {
                             return;
                         }
                         VersionAdapter adapter = new VersionAdapter(versionList, (version, file) -> {
-                            ProgressDialog resolving = new ProgressDialog(this);
+                            com.maxjubayeryt.modbundle.ui.M3ProgressDialog resolving = new com.maxjubayeryt.modbundle.ui.M3ProgressDialog(this);
                             resolving.setMessage("Resolving download link\u2026");
                             resolving.setCancelable(true);
                             resolving.show();
@@ -224,7 +223,7 @@ public class ModDetailActivity extends AppCompatActivity {
         String url = mod != null && mod.pageUrl != null && !mod.pageUrl.isEmpty()
                 ? mod.pageUrl
                 : "https://www.curseforge.com/minecraft/search?search=" + android.net.Uri.encode(mod != null ? mod.title : "");
-        new AlertDialog.Builder(this)
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle("Download restricted")
                 .setMessage("The author of this content has disabled downloads through third-party apps like ModBundle. You can still get it from the CurseForge website.")
                 .setPositiveButton("Open CurseForge", (d, w) ->
@@ -237,10 +236,10 @@ public class ModDetailActivity extends AppCompatActivity {
         String subFolder = "resourcepack".equals(projectType) ? "resourcepacks"
                          : "shader".equals(projectType) ? "shaderpacks" : "mods";
 
-        ProgressDialog pDialog = new ProgressDialog(this);
+        com.maxjubayeryt.modbundle.ui.M3ProgressDialog pDialog = new com.maxjubayeryt.modbundle.ui.M3ProgressDialog(this);
         pDialog.setTitle("Installing " + mod.title);
         pDialog.setMessage("Downloading\u2026");
-        pDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+        pDialog.setProgressStyle(com.maxjubayeryt.modbundle.ui.M3ProgressDialog.STYLE_HORIZONTAL);
         pDialog.setMax(100);
         pDialog.setCancelable(false);
         pDialog.show();
@@ -331,7 +330,7 @@ public class ModDetailActivity extends AppCompatActivity {
         boolean[] selected = new boolean[checked.size()];
         for (int i = 0; i < checked.size(); i++) selected[i] = checked.get(i);
 
-        new AlertDialog.Builder(this)
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
             .setTitle("Select dependencies to install")
             .setMultiChoiceItems(labels, selected, (dialog, which, isChecked) -> selected[which] = isChecked)
             .setPositiveButton("Install selected", (d, w) -> {
@@ -355,10 +354,10 @@ public class ModDetailActivity extends AppCompatActivity {
         if (version.loaders != null && !version.loaders.isEmpty())
             loader = version.loaders.get(0);
 
-        ProgressDialog pDialog = new ProgressDialog(this);
+        com.maxjubayeryt.modbundle.ui.M3ProgressDialog pDialog = new com.maxjubayeryt.modbundle.ui.M3ProgressDialog(this);
         pDialog.setTitle("Installing " + mod.title);
         pDialog.setMessage("Downloading…");
-        pDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+        pDialog.setProgressStyle(com.maxjubayeryt.modbundle.ui.M3ProgressDialog.STYLE_HORIZONTAL);
         pDialog.setMax(100);
         pDialog.setCancelable(false);
         pDialog.show();

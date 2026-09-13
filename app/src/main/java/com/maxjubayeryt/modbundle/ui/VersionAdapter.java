@@ -36,7 +36,9 @@ public class VersionAdapter extends RecyclerView.Adapter<VersionAdapter.ViewHold
         // Release type badge
         String type = v.versionType != null ? v.versionType : "release";
         holder.typeBadge.setText(type.substring(0, 1).toUpperCase() + type.substring(1));
-        int badgeColor = "release".equals(type) ? 0xFF2D7D46 : "beta".equals(type) ? 0xFF9649b8 : 0xFF666666;
+        int badgeColor = "release".equals(type) ? com.maxjubayeryt.modbundle.utils.ThemeColors.success(holder.typeBadge)
+                : "beta".equals(type) ? com.maxjubayeryt.modbundle.utils.ThemeColors.primary(holder.typeBadge)
+                : com.maxjubayeryt.modbundle.utils.ThemeColors.onSurfaceVariant(holder.typeBadge);
         holder.typeBadge.setTextColor(badgeColor);
 
         // Game versions

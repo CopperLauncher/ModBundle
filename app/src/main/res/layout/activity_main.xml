@@ -51,93 +51,24 @@
             android:orientation="vertical"
             android:visibility="visible">
 
-            <!-- Source Toggle -->
+            <!-- Search bar + filter button. Tap the filter icon to open a dialog with
+                 source (Modrinth/CurseForge), content type (Mods/Res Packs/Shaders),
+                 version, loader, and the snapshot toggle — replaces the old always-visible
+                 row of toggle buttons and spinners. -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
+                android:gravity="center_vertical"
                 android:paddingHorizontal="12dp"
                 android:paddingTop="10dp"
-                android:paddingBottom="4dp"
-                android:background="?attr/colorSurfaceContainer">
-                <Button
-                    android:id="@+id/btn_modrinth"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Modrinth"
-                    android:textSize="13sp"
-                    android:backgroundTint="?attr/colorPrimary"
-                    android:textColor="?attr/colorOnSurface"
-                    android:layout_marginEnd="4dp"
-                    style="@style/Widget.MaterialComponents.Button"/>
-                <Button
-                    android:id="@+id/btn_curseforge"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="CurseForge"
-                    android:textSize="13sp"
-                    android:backgroundTint="?attr/colorSurfaceContainer"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:layout_marginStart="4dp"
-                    style="@style/Widget.MaterialComponents.Button"/>
-            </LinearLayout>
-            <!-- Content Type Toggle -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:paddingHorizontal="12dp"
-                android:paddingBottom="4dp"
-                android:background="?attr/colorSurfaceContainer">
-                <Button
-                    android:id="@+id/btn_type_mods"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Mods"
-                    android:textSize="11sp"
-                    android:backgroundTint="?attr/colorPrimary"
-                    android:textColor="?attr/colorOnSurface"
-                    android:layout_marginEnd="3dp"
-                    style="@style/Widget.MaterialComponents.Button"/>
-                <Button
-                    android:id="@+id/btn_type_resourcepack"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Res Packs"
-                    android:textSize="11sp"
-                    android:backgroundTint="?attr/colorSurfaceContainer"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:layout_marginEnd="3dp"
-                    style="@style/Widget.MaterialComponents.Button"/>
-                <Button
-                    android:id="@+id/btn_type_shader"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Shaders"
-                    android:textSize="11sp"
-                    android:backgroundTint="?attr/colorSurfaceContainer"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    style="@style/Widget.MaterialComponents.Button"/>
-            </LinearLayout>
-            <!-- Search Bar -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:paddingHorizontal="12dp"
-                android:paddingTop="6dp"
-                android:paddingBottom="6dp"
+                android:paddingBottom="8dp"
                 android:background="?attr/colorSurfaceContainer">
 
                 <EditText
                     android:id="@+id/search_input"
                     android:layout_width="0dp"
-                    android:layout_height="42dp"
+                    android:layout_height="46dp"
                     android:layout_weight="1"
                     android:hint="Search mods…"
                     android:textColorHint="?attr/colorOnSurfaceVariant"
@@ -147,45 +78,17 @@
                     android:singleLine="true"
                     android:imeOptions="actionSearch"
                     android:inputType="text"/>
-            </LinearLayout>
 
-            <!-- Filters Row -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:paddingHorizontal="12dp"
-                android:paddingBottom="8dp"
-                android:background="?attr/colorSurfaceContainer">
-
-                <CheckBox
-                    android:id="@+id/btn_snapshots"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Include Snapshots"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="11sp"
-                    android:buttonTint="?attr/colorPrimary"
-                    android:checked="false"
-                    android:layout_marginEnd="4dp"/>
-                <Spinner
-                    android:id="@+id/spinner_version"
-                    android:layout_width="0dp"
-                    android:layout_height="38dp"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="8dp"
+                <ImageButton
+                    android:id="@+id/btn_filter"
+                    android:layout_width="46dp"
+                    android:layout_height="46dp"
+                    android:layout_marginStart="8dp"
+                    android:src="@drawable/ic_filter"
+                    android:tint="?attr/colorOnSurface"
                     android:background="@drawable/bg_spinner"
-                    android:popupBackground="?attr/colorSurfaceContainer"
-                    android:spinnerMode="dropdown"/>
-
-                <Spinner
-                    android:id="@+id/spinner_loader"
-                    android:layout_width="0dp"
-                    android:layout_height="38dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/bg_spinner"
-                    android:popupBackground="?attr/colorSurfaceContainer"
-                    android:spinnerMode="dropdown"/>
+                    android:padding="11dp"
+                    android:contentDescription="Filters"/>
             </LinearLayout>
 
             <!-- Progress -->
@@ -302,12 +205,36 @@
                 android:layout_weight="1"
                 android:padding="16dp"/>
 
+            <!-- Shown while refreshInstalled() is reading the instance folder in the
+                 background — replaces the old behavior of just showing nothing (or, for
+                 large mod folders, a noticeable stall) while the list populated. -->
+            <LinearLayout
+                android:id="@+id/installed_loading"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:visibility="gone">
+                <com.google.android.material.progressindicator.CircularProgressIndicator
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:indeterminate="true"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Loading content…"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="13sp"
+                    android:layout_marginTop="12dp"/>
+            </LinearLayout>
+
             <TextView
                 android:id="@+id/empty_installed"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="No mods installed yet"
-                android:textColor="#666"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="15sp"
                 android:gravity="center"
                 android:padding="32dp"
@@ -381,7 +308,36 @@
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:background="#333"
+                android:background="?attr/colorOutlineVariant"
+                android:layout_marginVertical="24dp"/>
+
+            <!-- Theme Section -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Theme"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="13sp"
+                android:layout_marginBottom="6dp"/>
+            <Spinner
+                android:id="@+id/spinner_theme"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:background="@drawable/bg_spinner"
+                android:popupBackground="?attr/colorSurfaceContainer"
+                android:spinnerMode="dropdown"
+                android:layout_marginBottom="6dp"/>
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="On Android 12+, colors also follow Material You (your wallpaper) automatically."
+                android:textColor="?attr/colorOutline"
+                android:textSize="11sp"/>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="?attr/colorOutlineVariant"
                 android:layout_marginVertical="24dp"/>
 
             <!-- About Section -->

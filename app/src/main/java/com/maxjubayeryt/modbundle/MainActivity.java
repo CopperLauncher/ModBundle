@@ -1,7 +1,6 @@
 package com.maxjubayeryt.modbundle;
 
 import android.app.AlertDialog;
-import android.app.ProgressDialog;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -52,9 +51,10 @@ public class MainActivity extends AppCompatActivity {
     // Views
     private View layoutBrowse, layoutInstalled, layoutSettings, layoutInstances;
     private EditText searchInput;
-    private Spinner spinnerVersion, spinnerLoader;
+    private ImageButton btnFilter;
     private RecyclerView browseRecycler, installedRecycler;
     private TextView emptyBrowse, emptyInstalled, tvFolderPath;
+    private View installedLoading;
     private ProgressBar browseProgress;
     private Button btnChooseFolder;
 
@@ -69,12 +69,15 @@ public class MainActivity extends AppCompatActivity {
     private boolean hasMoreResults = true;
     private boolean useCurseForge = false;
     private String currentProjectType = "mod";
-    private Button btnModrinth, btnCurseForge;
-    private Button btnTypeMods, btnTypeResourcepack, btnTypeShader;
+    // Replaced the old always-visible Modrinth/CurseForge + Mods/ResPacks/Shaders toggle
+    // buttons and version/loader spinners with a single filter dialog (see
+    // showFilterDialog()) — these two fields are now the source of truth for the
+    // currently selected game version/loader instead of a live Spinner selection.
+    private String currentGameVersion = "";
+    private String currentLoader = "";
     private TextView installedTabMods, installedTabShaders, installedTabResourcepacks, tvInstalledCount;
     private String currentInstalledType = "mods";
     private android.widget.Button btnCheckUpdates;
-    private android.widget.CheckBox btnSnapshots;
     private boolean includeSnapshots = false;
     private RecyclerView instancesRecycler;
     private String pendingLogoInstancePath;
@@ -114,8 +117,7 @@ public class MainActivity extends AppCompatActivity {
         setupFilters();
         setupSearch();
         setupBrowseRecycler();
-        setupSourceToggle();
-        setupTypeToggle();
+        btnFilter.setOnClickListener(v -> showFilterDialog());
         setupInstalledRecycler();
         setupSettings();
         requestManageStoragePermission();
@@ -151,20 +153,14 @@ public class MainActivity extends AppCompatActivity {
         layoutSettings  = findViewById(R.id.layout_settings);
         layoutInstances = findViewById(R.id.layout_instances);
         searchInput     = findViewById(R.id.search_input);
-        spinnerVersion  = findViewById(R.id.spinner_version);
-        spinnerLoader   = findViewById(R.id.spinner_loader);
+        btnFilter       = findViewById(R.id.btn_filter);
         browseRecycler  = findViewById(R.id.browse_recycler);
         installedRecycler = findViewById(R.id.installed_recycler);
         emptyBrowse     = findViewById(R.id.empty_browse);
         emptyInstalled  = findViewById(R.id.empty_installed);
+        installedLoading = findViewById(R.id.installed_loading);
         tvFolderPath    = findViewById(R.id.tv_folder_path);
         browseProgress  = findViewById(R.id.browse_progress);
-        btnModrinth = findViewById(R.id.btn_modrinth);
-        btnCurseForge = findViewById(R.id.btn_curseforge);
-        btnTypeMods = findViewById(R.id.btn_type_mods);
-        btnTypeResourcepack = findViewById(R.id.btn_type_resourcepack);
-        btnTypeShader = findViewById(R.id.btn_type_shader);
-        btnSnapshots    = findViewById(R.id.btn_snapshots);
         btnChooseFolder = findViewById(R.id.btn_choose_folder);
         installedTabMods = findViewById(R.id.installed_tab_mods);
         installedTabShaders = findViewById(R.id.installed_tab_shaders);
@@ -200,96 +196,20 @@ public class MainActivity extends AppCompatActivity {
     private void setupFilters() {
         // An active instance's own saved loader/version (set via "Edit Instance") takes
         // priority over the generic last-used Browse filter for the *initial* selection.
-        // This only ever reads from the instance — Browse's spinners changing afterward
-        // never write back into Instance Manager, that only happens through the Edit
-        // Instance dialog itself (instanceNameStore.setLoader/setVersion), so switching
-        // filters while browsing can't clobber what's saved for the instance.
+        // This only ever reads from the instance — the filter dialog changing these
+        // afterward never writes back into Instance Manager, that only happens through
+        // the Edit Instance dialog itself (instanceNameStore.setLoader/setVersion), so
+        // switching filters while browsing can't clobber what's saved for the instance.
         String instancePath = getActiveInstancePath();
         String instanceLoader = instancePath != null ? instanceNameStore.getLoader(instancePath) : "";
         String instanceVer = instancePath != null ? instanceNameStore.getVersion(instancePath) : "";
-        String initialLoader = !instanceLoader.isEmpty() ? instanceLoader : prefs.getLoader();
-        String initialVersion = !instanceVer.isEmpty() ? instanceVer : prefs.getGameVersion();
-
-        api.getGameVersions(includeSnapshots, versions -> {
-            String[] versionArray = versions.toArray(new String[0]);
-            runOnUiThread(() -> {
-                ArrayAdapter<String> vAdapter = new ArrayAdapter<>(this,
-                        android.R.layout.simple_spinner_item, versionArray);
-                vAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                spinnerVersion.setAdapter(vAdapter);
-                if (!initialVersion.isEmpty()) {
-                    int idx = versions.indexOf(initialVersion);
-                    if (idx >= 0) spinnerVersion.setSelection(idx);
-                }
-                if (prefs.hasModsFolder()) {
-                    searchMods(true);
-                }
-            });
-        }, error -> runOnUiThread(() ->
-            Toast.makeText(this, "Failed to load versions", Toast.LENGTH_SHORT).show()
-        ));
-
-        ArrayAdapter<String> lAdapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_item, LOADERS);
-        lAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinnerLoader.setAdapter(lAdapter);
-
-        if (!initialLoader.isEmpty()) {
-            int idx = Arrays.asList(LOADERS).indexOf(initialLoader);
-            if (idx >= 0) spinnerLoader.setSelection(idx);
+        currentLoader = !instanceLoader.isEmpty() ? instanceLoader : prefs.getLoader();
+        currentGameVersion = !instanceVer.isEmpty() ? instanceVer : prefs.getGameVersion();
+        if (prefs.hasModsFolder()) {
+            searchMods(true);
         }
-
-        AdapterView.OnItemSelectedListener filterListener = new AdapterView.OnItemSelectedListener() {
-            boolean ready = false;
-            public void onItemSelected(AdapterView<?> a, View v, int p, long id) {
-                if (!ready) { ready = true; return; }
-                saveFilters();
-                searchMods(true);
-            }
-            public void onNothingSelected(AdapterView<?> a) {}
-        };
-        spinnerVersion.setOnItemSelectedListener(filterListener);
-        spinnerLoader.setOnItemSelectedListener(filterListener);
-
-        btnSnapshots.setOnCheckedChangeListener((b, checked) -> {
-            includeSnapshots = checked;
-            api.getGameVersions(includeSnapshots, versions -> {
-                String[] arr = versions.toArray(new String[0]);
-                runOnUiThread(() -> {
-                    android.widget.ArrayAdapter<String> a = new android.widget.ArrayAdapter<>(this,
-                        android.R.layout.simple_spinner_item, arr);
-                    a.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                    spinnerVersion.setAdapter(a);
-                });
-            }, e -> {});
-        });
     }
 
-    private void setupTypeToggle() {
-        android.content.res.ColorStateList active = android.content.res.ColorStateList.valueOf(0xFF9649b8);
-        android.content.res.ColorStateList inactive = android.content.res.ColorStateList.valueOf(0xFF242424);
-        btnTypeMods.setOnClickListener(v -> {
-            currentProjectType = "mod";
-            btnTypeMods.setBackgroundTintList(active); btnTypeMods.setTextColor(0xFFFFFFFF);
-            btnTypeResourcepack.setBackgroundTintList(inactive); btnTypeResourcepack.setTextColor(0xFFAAAAAA);
-            btnTypeShader.setBackgroundTintList(inactive); btnTypeShader.setTextColor(0xFFAAAAAA);
-            searchMods(true);
-        });
-        btnTypeResourcepack.setOnClickListener(v -> {
-            currentProjectType = "resourcepack";
-            btnTypeResourcepack.setBackgroundTintList(active); btnTypeResourcepack.setTextColor(0xFFFFFFFF);
-            btnTypeMods.setBackgroundTintList(inactive); btnTypeMods.setTextColor(0xFFAAAAAA);
-            btnTypeShader.setBackgroundTintList(inactive); btnTypeShader.setTextColor(0xFFAAAAAA);
-            searchMods(true);
-        });
-        btnTypeShader.setOnClickListener(v -> {
-            currentProjectType = "shader";
-            btnTypeShader.setBackgroundTintList(active); btnTypeShader.setTextColor(0xFFFFFFFF);
-            btnTypeMods.setBackgroundTintList(inactive); btnTypeMods.setTextColor(0xFFAAAAAA);
-            btnTypeResourcepack.setBackgroundTintList(inactive); btnTypeResourcepack.setTextColor(0xFFAAAAAA);
-            searchMods(true);
-        });
-    }
 
 
     private void requestManageStoragePermission() {
@@ -331,14 +251,14 @@ public class MainActivity extends AppCompatActivity {
             android.widget.EditText etName = new android.widget.EditText(this);
             etName.setHint("Instance name");
             etName.setText(currentName);
-            etName.setTextColor(0xFFFFFFFF);
-            etName.setHintTextColor(0xFF666666);
+            etName.setTextColor(com.maxjubayeryt.modbundle.utils.ThemeColors.onSurface(etName));
+            etName.setHintTextColor(com.maxjubayeryt.modbundle.utils.ThemeColors.onSurfaceVariant(etName));
             layout.addView(etName);
 
             // Loader label + spinner
             android.widget.TextView tvLoader = new android.widget.TextView(this);
             tvLoader.setText("Loader");
-            tvLoader.setTextColor(0xFF888888);
+            tvLoader.setTextColor(com.maxjubayeryt.modbundle.utils.ThemeColors.onSurfaceVariant(tvLoader));
             tvLoader.setTextSize(12f);
             tvLoader.setPadding(0, 20, 0, 4);
             layout.addView(tvLoader);
@@ -356,7 +276,7 @@ public class MainActivity extends AppCompatActivity {
             // MC Version label + spinner
             android.widget.TextView tvVer = new android.widget.TextView(this);
             tvVer.setText("Minecraft Version");
-            tvVer.setTextColor(0xFF888888);
+            tvVer.setTextColor(com.maxjubayeryt.modbundle.utils.ThemeColors.onSurfaceVariant(tvVer));
             tvVer.setTextSize(12f);
             tvVer.setPadding(0, 20, 0, 4);
             layout.addView(tvVer);
@@ -364,8 +284,8 @@ public class MainActivity extends AppCompatActivity {
             // Include snapshots checkbox
             android.widget.CheckBox cbSnap = new android.widget.CheckBox(this);
             cbSnap.setText("Include Snapshots");
-            cbSnap.setTextColor(0xFFAAAAAA);
-            CompoundButtonCompat.setButtonTintList(cbSnap, android.content.res.ColorStateList.valueOf(0xFF9649b8));
+            cbSnap.setTextColor(com.maxjubayeryt.modbundle.utils.ThemeColors.onSurfaceVariant(cbSnap));
+            CompoundButtonCompat.setButtonTintList(cbSnap, android.content.res.ColorStateList.valueOf(com.maxjubayeryt.modbundle.utils.ThemeColors.primary(cbSnap)));
             cbSnap.setChecked(false);
             layout.addView(cbSnap);
 
@@ -404,7 +324,7 @@ public class MainActivity extends AppCompatActivity {
                 loadVersions[0].run();
             });
 
-            new AlertDialog.Builder(this)
+            new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle("Edit Instance")
                 .setView(layout)
                 .setPositiveButton("Save", (d, w) -> {
@@ -431,7 +351,7 @@ public class MainActivity extends AppCompatActivity {
 
             ArrayAdapter<String> logoAdapter = new ArrayAdapter<>(this, android.R.layout.select_dialog_item, labels);
 
-            new AlertDialog.Builder(this)
+            new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle("Choose Logo")
                 .setAdapter(logoAdapter, (d, which) -> {
                     if (logoNames[which].equals("gallery")) {
@@ -451,7 +371,7 @@ public class MainActivity extends AppCompatActivity {
         });
 
         instanceAdapter.setDeleteListener((instance, path) -> {
-            new AlertDialog.Builder(this)
+            new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle("Remove instance")
                 .setMessage("Remove this instance from the app? This will not delete the actual folder.")
                 .setPositiveButton("Remove", (d, w) -> {
@@ -569,33 +489,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    private void setupSourceToggle() {
-        boolean curseForgeAvailable = com.maxjubayeryt.modbundle.api.CurseForgeApi.isEnabled();
-        if (!curseForgeAvailable) {
-            btnCurseForge.setEnabled(false);
-            btnCurseForge.setAlpha(0.5f);
-        }
-        btnModrinth.setOnClickListener(v -> {
-            useCurseForge = false;
-            btnModrinth.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF9649b8));
-            btnModrinth.setTextColor(0xFFFFFFFF);
-            btnCurseForge.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF242424));
-            btnCurseForge.setTextColor(0xFFAAAAAA);
-            searchMods(true);
-        });
-        btnCurseForge.setOnClickListener(v -> {
-            if (!curseForgeAvailable) {
-                Toast.makeText(this, "CurseForge is currently unavailable", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            useCurseForge = true;
-            btnCurseForge.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF9649b8));
-            btnCurseForge.setTextColor(0xFFFFFFFF);
-            btnModrinth.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF242424));
-            btnModrinth.setTextColor(0xFFAAAAAA);
-            searchMods(true);
-        });
-    }
 
     private void setupSearch() {
         searchInput.addTextChangedListener(new TextWatcher() {
@@ -660,7 +553,7 @@ public class MainActivity extends AppCompatActivity {
                 String modName = (mod instanceof androidx.documentfile.provider.DocumentFile)
                     ? ((androidx.documentfile.provider.DocumentFile) mod).getName()
                     : ((java.io.File) mod).getName();
-                new AlertDialog.Builder(this)
+                new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                     .setTitle("Delete?")
                     .setMessage("Remove \"" + modName + "\"?")
                     .setPositiveButton("Delete", (d, w) -> {
@@ -698,11 +591,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void switchInstalledTab() {
-        installedTabMods.setTextColor("mods".equals(currentInstalledType) ? 0xFF9649b8 : 0xFF888888);
+        installedTabMods.setTextColor("mods".equals(currentInstalledType) ? com.maxjubayeryt.modbundle.utils.ThemeColors.primary(installedTabMods) : com.maxjubayeryt.modbundle.utils.ThemeColors.onSurfaceVariant(installedTabMods));
         installedTabMods.setTypeface(null, "mods".equals(currentInstalledType) ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
-        installedTabShaders.setTextColor("shaderpacks".equals(currentInstalledType) ? 0xFF9649b8 : 0xFF888888);
+        installedTabShaders.setTextColor("shaderpacks".equals(currentInstalledType) ? com.maxjubayeryt.modbundle.utils.ThemeColors.primary(installedTabShaders) : com.maxjubayeryt.modbundle.utils.ThemeColors.onSurfaceVariant(installedTabShaders));
         installedTabShaders.setTypeface(null, "shaderpacks".equals(currentInstalledType) ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
-        installedTabResourcepacks.setTextColor("resourcepacks".equals(currentInstalledType) ? 0xFF9649b8 : 0xFF888888);
+        installedTabResourcepacks.setTextColor("resourcepacks".equals(currentInstalledType) ? com.maxjubayeryt.modbundle.utils.ThemeColors.primary(installedTabResourcepacks) : com.maxjubayeryt.modbundle.utils.ThemeColors.onSurfaceVariant(installedTabResourcepacks));
         installedTabResourcepacks.setTypeface(null, "resourcepacks".equals(currentInstalledType) ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
         installedAdapter.setShowDisable("mods".equals(currentInstalledType));
         installedAdapter.setCurrentType(currentInstalledType);
@@ -712,6 +605,27 @@ public class MainActivity extends AppCompatActivity {
     private void setupSettings() {
         btnChooseFolder.setOnClickListener(v -> openFolderPicker());
         updateFolderLabel();
+
+        Spinner spTheme = findViewById(R.id.spinner_theme);
+        if (spTheme != null) {
+            String[] themeOptions = {"System Default", "Light", "Dark"};
+            ArrayAdapter<String> themeAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, themeOptions);
+            themeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            spTheme.setAdapter(themeAdapter);
+            spTheme.setSelection(prefs.getThemeMode());
+            spTheme.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                boolean ready = false;
+                public void onItemSelected(AdapterView<?> a, View v, int position, long id) {
+                    if (!ready) { ready = true; return; }
+                    prefs.saveThemeMode(position);
+                    // Recreating applies the new night mode immediately without losing the
+                    // current tab/instance/search state (onCreate re-reads all of that).
+                    com.maxjubayeryt.modbundle.ModBundleApp.applyThemeMode(position);
+                    recreate();
+                }
+                public void onNothingSelected(AdapterView<?> a) {}
+            });
+        }
 
         int[] linkIds = {
             R.id.tv_link_youtube, R.id.tv_github_link, R.id.tv_link_kofi,
@@ -806,7 +720,7 @@ public class MainActivity extends AppCompatActivity {
     private void showInstallDialog(ModResult mod) {
         String version = getSelectedVersion();
         String loader  = getSelectedLoader();
-        ProgressDialog loading = new ProgressDialog(this);
+        com.maxjubayeryt.modbundle.ui.M3ProgressDialog loading = new com.maxjubayeryt.modbundle.ui.M3ProgressDialog(this);
         loading.setMessage("Fetching versions…");
         loading.show();
 
@@ -830,7 +744,7 @@ public class MainActivity extends AppCompatActivity {
                                 Toast.makeText(this, "Unable to download file", Toast.LENGTH_SHORT).show();
                                 return;
                             }
-                            new AlertDialog.Builder(this)
+                            new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                                 .setTitle("Install: " + mod.title)
                                 .setMessage(fileName)
                                 .setPositiveButton("Install", (d, w) -> {
@@ -867,7 +781,7 @@ public class MainActivity extends AppCompatActivity {
                     ModVersion v = versions.get(i);
                     labels[i] = v.versionNumber + " (" + String.join(", ", v.gameVersions) + ")";
                 }
-                new AlertDialog.Builder(this)
+                new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                     .setTitle("Install: " + mod.title)
                     .setItems(labels, (d, which) -> {
                         ModVersion selected = versions.get(which);
@@ -884,10 +798,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startDownload(ModResult mod, ModVersion version, ModVersion.VersionFile file, List<ModVersion.Dependency> dependencies) {
-        ProgressDialog progress = new ProgressDialog(this);
+        com.maxjubayeryt.modbundle.ui.M3ProgressDialog progress = new com.maxjubayeryt.modbundle.ui.M3ProgressDialog(this);
         progress.setTitle("Installing " + mod.title);
         progress.setMessage("Downloading…");
-        progress.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+        progress.setProgressStyle(com.maxjubayeryt.modbundle.ui.M3ProgressDialog.STYLE_HORIZONTAL);
         progress.setMax(100);
         progress.setCancelable(false);
         progress.show();
@@ -965,7 +879,7 @@ public class MainActivity extends AppCompatActivity {
         boolean[] initialChecked = new boolean[checked.size()];
         for (int i = 0; i < checked.size(); i++) initialChecked[i] = checked.get(i);
 
-        new AlertDialog.Builder(this)
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
             .setTitle("Install dependencies")
             .setMessage("Select which dependencies to install with this mod.")
             .setMultiChoiceItems(items, initialChecked, (dialog, which, isChecked) -> initialChecked[which] = isChecked)
@@ -1073,7 +987,7 @@ public class MainActivity extends AppCompatActivity {
                 ? ((androidx.documentfile.provider.DocumentFile) mod).getName()
                 : ((java.io.File) mod).getName();
 
-        ProgressDialog resolving = new ProgressDialog(this);
+        com.maxjubayeryt.modbundle.ui.M3ProgressDialog resolving = new com.maxjubayeryt.modbundle.ui.M3ProgressDialog(this);
         resolving.setTitle("Looking up " + fileName + "\u2026");
         resolving.setMessage("Identifying content on Modrinth/CurseForge");
         resolving.setCancelable(true);
@@ -1099,7 +1013,7 @@ public class MainActivity extends AppCompatActivity {
                 View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_version_list, null);
                 RecyclerView recycler = dialogView.findViewById(R.id.detail_versions_recycler);
                 recycler.setLayoutManager(new LinearLayoutManager(this));
-                AlertDialog dialog = new AlertDialog.Builder(this)
+                AlertDialog dialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                         .setTitle("Switch version")
                         .setView(dialogView)
                         .setNegativeButton("Cancel", null)
@@ -1161,7 +1075,7 @@ public class MainActivity extends AppCompatActivity {
         boolean wasDisabled = oldFileName.endsWith(".disabled");
         String targetName = wasDisabled ? newFile.filename + ".disabled" : newFile.filename;
 
-        ProgressDialog progress = new ProgressDialog(this);
+        com.maxjubayeryt.modbundle.ui.M3ProgressDialog progress = new com.maxjubayeryt.modbundle.ui.M3ProgressDialog(this);
         progress.setTitle("Switching version\u2026");
         progress.show();
 
@@ -1199,7 +1113,7 @@ public class MainActivity extends AppCompatActivity {
         if (mod instanceof androidx.documentfile.provider.DocumentFile) ((androidx.documentfile.provider.DocumentFile) mod).delete();
         else if (mod instanceof java.io.File) ((java.io.File) mod).delete();
 
-        ProgressDialog progress = new ProgressDialog(this);
+        com.maxjubayeryt.modbundle.ui.M3ProgressDialog progress = new com.maxjubayeryt.modbundle.ui.M3ProgressDialog(this);
         progress.setTitle("Updating...");
         progress.show();
 
@@ -1246,6 +1160,8 @@ public class MainActivity extends AppCompatActivity {
         // captured up front so a stale result from a since-abandoned tab switch is dropped
         // instead of overwriting the list for whichever tab is now showing.
         final String requestedType = currentInstalledType;
+        installedLoading.setVisibility(View.VISIBLE);
+        emptyInstalled.setVisibility(View.GONE);
         sBgExecutor.execute(() -> {
             List<Object> collected = new ArrayList<>();
             try {
@@ -1295,6 +1211,7 @@ public class MainActivity extends AppCompatActivity {
 
             handler.post(() -> {
                 if (!requestedType.equals(currentInstalledType)) return; // user switched tabs while this was loading
+                installedLoading.setVisibility(View.GONE);
                 installedMods.clear();
                 installedMods.addAll(collected);
                 installedAdapter.notifyDataSetChanged();
@@ -1434,7 +1351,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showFolderPickerPrompt() {
-        new AlertDialog.Builder(this)
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
             .setTitle("Choose Folder")
             .setMessage("Select your instance folder.")
             .setPositiveButton("Choose", (d, w) -> openFolderPicker())
@@ -1450,27 +1367,89 @@ public class MainActivity extends AppCompatActivity {
      */
     private void applyInstanceFilters(String path) {
         String savedLoader = instanceNameStore.getLoader(path);
-        if (savedLoader != null && !savedLoader.isEmpty() && spinnerLoader != null && spinnerLoader.getAdapter() != null) {
-            for (int i = 0; i < spinnerLoader.getAdapter().getCount(); i++) {
-                if (savedLoader.equalsIgnoreCase(String.valueOf(spinnerLoader.getAdapter().getItem(i)))) {
-                    spinnerLoader.setSelection(i); // triggers filterListener -> saveFilters() + searchMods()
-                    break;
-                }
-            }
-        }
-
         String savedVersion = instanceNameStore.getVersion(path);
-        if (savedVersion != null && !savedVersion.isEmpty()) {
-            api.getGameVersions(includeSnapshots, versions -> handler.post(() -> {
-                if (spinnerVersion == null || spinnerVersion.getAdapter() == null) return;
-                for (int i = 0; i < spinnerVersion.getAdapter().getCount(); i++) {
-                    if (savedVersion.equals(spinnerVersion.getAdapter().getItem(i))) {
-                        spinnerVersion.setSelection(i); // triggers filterListener -> saveFilters() + searchMods()
-                        break;
-                    }
-                }
+        boolean changed = false;
+        if (savedLoader != null && !savedLoader.isEmpty()) { currentLoader = savedLoader; changed = true; }
+        if (savedVersion != null && !savedVersion.isEmpty()) { currentGameVersion = savedVersion; changed = true; }
+        if (changed) { saveFilters(); searchMods(true); }
+    }
+
+    /**
+     * Replaces the old always-visible Modrinth/CurseForge toggle, Mods/Res Packs/Shaders
+     * toggle, and version/loader spinners with a single dialog opened from the filter
+     * icon next to the search bar. All the underlying state (useCurseForge,
+     * currentProjectType, currentGameVersion, currentLoader, includeSnapshots) is
+     * unchanged — only how it's edited moved.
+     */
+    private void showFilterDialog() {
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_filters, null);
+        Spinner spSource = dialogView.findViewById(R.id.filter_spinner_source);
+        Spinner spContentType = dialogView.findViewById(R.id.filter_spinner_content_type);
+        Spinner spVersion = dialogView.findViewById(R.id.filter_spinner_version);
+        Spinner spLoader = dialogView.findViewById(R.id.filter_spinner_loader);
+        com.google.android.material.materialswitch.MaterialSwitch swSnapshots = dialogView.findViewById(R.id.filter_switch_snapshots);
+
+        boolean curseForgeAvailable = com.maxjubayeryt.modbundle.api.CurseForgeApi.isEnabled();
+        String[] sources = {"Modrinth", "CurseForge"};
+        ArrayAdapter<String> sourceAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, sources);
+        sourceAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spSource.setAdapter(sourceAdapter);
+        spSource.setSelection(useCurseForge ? 1 : 0);
+        if (!curseForgeAvailable) spSource.setEnabled(false);
+
+        String[] contentTypes = {"Mods", "Resource Packs", "Shaders"};
+        String[] contentTypeValues = {"mod", "resourcepack", "shader"};
+        ArrayAdapter<String> typeAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, contentTypes);
+        typeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spContentType.setAdapter(typeAdapter);
+        spContentType.setSelection(Math.max(0, Arrays.asList(contentTypeValues).indexOf(currentProjectType)));
+
+        ArrayAdapter<String> loaderAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, LOADERS);
+        loaderAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spLoader.setAdapter(loaderAdapter);
+        int loaderIdx = Arrays.asList(LOADERS).indexOf(currentLoader.isEmpty() ? "Any" : currentLoader);
+        spLoader.setSelection(Math.max(0, loaderIdx));
+
+        swSnapshots.setChecked(includeSnapshots);
+
+        // Version list depends on the snapshot toggle, so it's (re)loaded both on open and
+        // whenever the switch flips, keeping the currently selected version if it's still
+        // present in the new list.
+        api.getGameVersions(includeSnapshots, versions -> handler.post(() -> {
+            ArrayAdapter<String> vAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, versions);
+            vAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            spVersion.setAdapter(vAdapter);
+            int idx = versions.indexOf(currentGameVersion.isEmpty() ? "Any" : currentGameVersion);
+            if (idx >= 0) spVersion.setSelection(idx);
+        }), err -> {});
+
+        swSnapshots.setOnCheckedChangeListener((btn, checked) -> {
+            api.getGameVersions(checked, versions -> handler.post(() -> {
+                ArrayAdapter<String> vAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, versions);
+                vAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                String previouslySelected = spVersion.getSelectedItem() != null ? spVersion.getSelectedItem().toString() : "Any";
+                spVersion.setAdapter(vAdapter);
+                int idx = versions.indexOf(previouslySelected);
+                spVersion.setSelection(idx >= 0 ? idx : 0);
             }), err -> {});
-        }
+        });
+
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle("Filters")
+                .setView(dialogView)
+                .setPositiveButton("Apply", (d, w) -> {
+                    if (curseForgeAvailable) useCurseForge = spSource.getSelectedItemPosition() == 1;
+                    currentProjectType = contentTypeValues[spContentType.getSelectedItemPosition()];
+                    Object loaderSel = spLoader.getSelectedItem();
+                    currentLoader = loaderSel != null ? loaderSel.toString() : "Any";
+                    Object versionSel = spVersion.getSelectedItem();
+                    currentGameVersion = versionSel != null ? versionSel.toString() : "Any";
+                    includeSnapshots = swSnapshots.isChecked();
+                    saveFilters();
+                    searchMods(true);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void saveFilters() { prefs.saveFilters(getSelectedVersion(), getSelectedLoader()); }
@@ -1487,11 +1466,9 @@ public class MainActivity extends AppCompatActivity {
         handler.postDelayed(pendingMetaCacheRefresh, 150);
     }
     private String getSelectedVersion() {
-        String v = spinnerVersion.getSelectedItem() != null ? ((String) spinnerVersion.getSelectedItem()).trim() : "";
-        return "Any".equalsIgnoreCase(v) ? "" : v;
+        return "Any".equalsIgnoreCase(currentGameVersion) ? "" : currentGameVersion;
     }
     private String getSelectedLoader() {
-        String l = spinnerLoader.getSelectedItem() != null ? ((String) spinnerLoader.getSelectedItem()).trim() : "";
-        return "Any".equalsIgnoreCase(l) ? "" : l.toLowerCase();
+        return "Any".equalsIgnoreCase(currentLoader) ? "" : currentLoader.toLowerCase();
     }
 }

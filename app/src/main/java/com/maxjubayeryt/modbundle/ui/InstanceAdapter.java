@@ -65,13 +65,20 @@ public class InstanceAdapter extends RecyclerView.Adapter<InstanceAdapter.ViewHo
 
         String customName = nameStore.getName(path);
         String displayName;
-        if (customName != null && !customName.isEmpty()) {
+        if (customName != null && !customName.trim().isEmpty()) {
             displayName = customName;
         } else if (instance.contentUri) {
+            // Tree URIs are typically "primary:FolderName" (or "1234-ABCD:FolderName" for
+            // removable storage) — strip the volume prefix so the instance shows its actual
+            // folder name instead of the raw URI segment.
             String candidate = Uri.parse(path).getLastPathSegment();
-            displayName = candidate != null && !candidate.isEmpty() ? candidate : path;
+            if (candidate != null && candidate.contains(":")) {
+                candidate = candidate.substring(candidate.lastIndexOf(':') + 1);
+            }
+            displayName = candidate != null && !candidate.trim().isEmpty() ? candidate : path;
         } else {
-            displayName = new File(path).getName();
+            String fromFile = new File(path).getName();
+            displayName = fromFile != null && !fromFile.trim().isEmpty() ? fromFile : path;
         }
         holder.name.setText(displayName);
         holder.path.setText(path.length() > 55 ? "..." + path.substring(path.length() - 55) : path);
@@ -115,7 +122,7 @@ public class InstanceAdapter extends RecyclerView.Adapter<InstanceAdapter.ViewHo
         boolean isActive = path.equals(activeInstancePath);
         holder.select.setText(isActive ? "✓ Active" : "Select");
         holder.select.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
-            isActive ? 0xFF4a3a6b : 0xFF9649b8));
+            isActive ? com.maxjubayeryt.modbundle.utils.ThemeColors.surfaceContainer(holder.select) : com.maxjubayeryt.modbundle.utils.ThemeColors.primary(holder.select)));
 
         holder.logo.setOnClickListener(v -> { if (logoListener != null) logoListener.onChangeLogo(instance, path); });
         holder.btnRename.setOnClickListener(v -> { if (renameListener != null) renameListener.onRename(instance, displayName); });

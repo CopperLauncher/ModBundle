@@ -44,4 +44,9 @@ public class PrefManager {
     public boolean hasInstanceFolder() { return getInstanceUri() != null; }
     @Deprecated
     public boolean hasModsFolder() { return hasInstanceFolder(); }
+
+    private static final String KEY_THEME_MODE = "theme_mode";
+    /** 0 = System Default, 1 = Light, 2 = Dark */
+    public void saveThemeMode(int mode) { prefs.edit().putInt(KEY_THEME_MODE, mode).apply(); }
+    public int getThemeMode() { return prefs.getInt(KEY_THEME_MODE, 2); } // default: Dark, matching the app's prior forced-dark behavior
 }
