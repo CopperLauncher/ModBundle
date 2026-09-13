@@ -53,4 +53,24 @@
     <color name="copper_dark">@color/md_primary_container</color>
     <color name="surface">@color/md_surface</color>
     <color name="card_bg">@color/md_surface_container</color>
+
+    <color name="preset_blue_primary">#9ECAFF</color>
+    <color name="preset_blue_on_primary">#003258</color>
+    <color name="preset_blue_primary_container">#00497D</color>
+    <color name="preset_blue_on_primary_container">#D1E4FF</color>
+
+    <color name="preset_green_primary">#9CD67D</color>
+    <color name="preset_green_on_primary">#0F3900</color>
+    <color name="preset_green_primary_container">#1F5200</color>
+    <color name="preset_green_on_primary_container">#B7F397</color>
+
+    <color name="preset_orange_primary">#FFB868</color>
+    <color name="preset_orange_on_primary">#4A2800</color>
+    <color name="preset_orange_primary_container">#6A3C00</color>
+    <color name="preset_orange_on_primary_container">#FFDCBE</color>
+
+    <color name="preset_pink_primary">#FFB1C4</color>
+    <color name="preset_pink_on_primary">#650033</color>
+    <color name="preset_pink_primary_container">#8E0049</color>
+    <color name="preset_pink_on_primary_container">#FFD9E1</color>
 </resources>

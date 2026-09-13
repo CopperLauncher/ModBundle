@@ -1,6 +1,6 @@
 package com.maxjubayeryt.modbundle;
 
-import android.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -106,6 +106,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        com.maxjubayeryt.modbundle.utils.ThemeManager.apply(this);
         setContentView(R.layout.activity_main);
 
         prefs = new PrefManager(this);
@@ -621,6 +622,40 @@ public class MainActivity extends AppCompatActivity {
                     // Recreating applies the new night mode immediately without losing the
                     // current tab/instance/search state (onCreate re-reads all of that).
                     com.maxjubayeryt.modbundle.ModBundleApp.applyThemeMode(position);
+                    recreate();
+                }
+                public void onNothingSelected(AdapterView<?> a) {}
+            });
+        }
+
+        // Color scheme: Material You dynamic color (wallpaper-derived, Android 12+ only)
+        // vs. a manual preset that works on any Android version — see ThemeManager.
+        boolean dynamicAvailable = com.google.android.material.color.DynamicColors.isDynamicColorAvailable();
+        com.google.android.material.materialswitch.MaterialSwitch swDynamic = findViewById(R.id.switch_dynamic_color);
+        Spinner spColorPreset = findViewById(R.id.spinner_color_preset);
+        if (swDynamic != null) {
+            swDynamic.setEnabled(dynamicAvailable);
+            swDynamic.setChecked(dynamicAvailable && prefs.getUseDynamicColor());
+            if (!dynamicAvailable) {
+                swDynamic.setText("Material You needs Android 12+");
+            }
+            swDynamic.setOnCheckedChangeListener((btn, checked) -> {
+                if (!btn.isPressed()) return; // ignore the setChecked() call above
+                prefs.saveUseDynamicColor(checked);
+                recreate();
+            });
+        }
+        if (spColorPreset != null) {
+            String[] presetOptions = {"Purple (default)", "Blue", "Green", "Orange", "Pink"};
+            ArrayAdapter<String> presetAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, presetOptions);
+            presetAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            spColorPreset.setAdapter(presetAdapter);
+            spColorPreset.setSelection(prefs.getColorPreset());
+            spColorPreset.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                boolean ready = false;
+                public void onItemSelected(AdapterView<?> a, View v, int position, long id) {
+                    if (!ready) { ready = true; return; }
+                    prefs.saveColorPreset(position);
                     recreate();
                 }
                 public void onNothingSelected(AdapterView<?> a) {}

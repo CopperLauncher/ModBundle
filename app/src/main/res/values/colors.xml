@@ -59,4 +59,29 @@
     <color name="copper_dark">@color/md_primary_container</color>
     <color name="surface">@color/md_surface</color>
     <color name="card_bg">@color/md_surface_container</color>
+
+    <!-- Manual color-preset palettes, for picking an M3 accent color on devices below
+         Android 12 (where there's no OS-level wallpaper-based dynamic color to draw from).
+         Only the roles that actually change the accent's look are overridden per preset;
+         everything else (surface, background, error, outline) stays the same as the base
+         theme. Applied via ThemeOverlay styles in themes.xml — see ThemeManager. -->
+    <color name="preset_blue_primary">#0061A4</color>
+    <color name="preset_blue_on_primary">#FFFFFF</color>
+    <color name="preset_blue_primary_container">#D1E4FF</color>
+    <color name="preset_blue_on_primary_container">#001D36</color>
+
+    <color name="preset_green_primary">#386A20</color>
+    <color name="preset_green_on_primary">#FFFFFF</color>
+    <color name="preset_green_primary_container">#B7F397</color>
+    <color name="preset_green_on_primary_container">#072100</color>
+
+    <color name="preset_orange_primary">#8B5000</color>
+    <color name="preset_orange_on_primary">#FFFFFF</color>
+    <color name="preset_orange_primary_container">#FFDCBE</color>
+    <color name="preset_orange_on_primary_container">#2C1600</color>
+
+    <color name="preset_pink_primary">#A2184E</color>
+    <color name="preset_pink_on_primary">#FFFFFF</color>
+    <color name="preset_pink_primary_container">#FFD9E1</color>
+    <color name="preset_pink_on_primary_container">#3F0018</color>
 </resources>

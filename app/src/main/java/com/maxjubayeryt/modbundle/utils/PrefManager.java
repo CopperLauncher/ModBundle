@@ -49,4 +49,13 @@ public class PrefManager {
     /** 0 = System Default, 1 = Light, 2 = Dark */
     public void saveThemeMode(int mode) { prefs.edit().putInt(KEY_THEME_MODE, mode).apply(); }
     public int getThemeMode() { return prefs.getInt(KEY_THEME_MODE, 2); } // default: Dark, matching the app's prior forced-dark behavior
+
+    private static final String KEY_COLOR_PRESET = "color_preset";
+    private static final String KEY_USE_DYNAMIC_COLOR = "use_dynamic_color";
+    /** 0 = Purple (default), 1 = Blue, 2 = Green, 3 = Orange, 4 = Pink */
+    public void saveColorPreset(int preset) { prefs.edit().putInt(KEY_COLOR_PRESET, preset).apply(); }
+    public int getColorPreset() { return prefs.getInt(KEY_COLOR_PRESET, 0); }
+    /** Whether to follow the device wallpaper's colors (Android 12+ only) instead of the manual preset above. */
+    public void saveUseDynamicColor(boolean use) { prefs.edit().putBoolean(KEY_USE_DYNAMIC_COLOR, use).apply(); }
+    public boolean getUseDynamicColor() { return prefs.getBoolean(KEY_USE_DYNAMIC_COLOR, true); }
 }

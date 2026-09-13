@@ -2,7 +2,6 @@ package com.maxjubayeryt.modbundle;
 
 import android.app.Application;
 import androidx.appcompat.app.AppCompatDelegate;
-import com.google.android.material.color.DynamicColors;
 import com.maxjubayeryt.modbundle.utils.PrefManager;
 
 public class ModBundleApp extends Application {
@@ -10,10 +9,10 @@ public class ModBundleApp extends Application {
     public void onCreate() {
         super.onCreate();
         applyThemeMode(new PrefManager(this).getThemeMode());
-        // Material You dynamic color: on Android 12+ this replaces the fixed M3 palette in
-        // themes.xml with one derived from the device's wallpaper, applied automatically to
-        // every Activity. On older devices this is a no-op and the fixed palette is used.
-        DynamicColors.applyToActivitiesIfAvailable(this);
+        // Color scheme (Material You dynamic color vs. a manual preset) is applied per
+        // Activity by ThemeManager.apply(), called at the top of each Activity's onCreate
+        // — not here app-wide — so a person can pick a fixed preset in Settings even on a
+        // device where dynamic color would otherwise be available. See ThemeManager.
     }
 
     /** 0 = System Default, 1 = Light, 2 = Dark */

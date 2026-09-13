@@ -48,4 +48,42 @@
         <item name="colorAccent">@color/md_primary</item>
         <item name="android:textColor">@color/md_on_surface</item>
     </style>
+
+    <!--
+        Manual color-preset overlays, applied via ThemeManager on top of AppTheme when
+        the person picks a preset in Settings — this is what lets the M3 color scheme be
+        changed on any Android version, not just 12+ (which is the only OS version with
+        real wallpaper-based dynamic color). "Purple" is just AppTheme itself, so it has
+        no overlay entry. Only the primary-related roles are overridden; everything else
+        (surface, secondary, tertiary, error) is shared with the base theme so the rest
+        of the UI doesn't shift, just the accent.
+    -->
+    <style name="ThemeOverlay.App.Blue" parent="">
+        <item name="colorPrimary">@color/preset_blue_primary</item>
+        <item name="colorOnPrimary">@color/preset_blue_on_primary</item>
+        <item name="colorPrimaryContainer">@color/preset_blue_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/preset_blue_on_primary_container</item>
+        <item name="colorAccent">@color/preset_blue_primary</item>
+    </style>
+    <style name="ThemeOverlay.App.Green" parent="">
+        <item name="colorPrimary">@color/preset_green_primary</item>
+        <item name="colorOnPrimary">@color/preset_green_on_primary</item>
+        <item name="colorPrimaryContainer">@color/preset_green_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/preset_green_on_primary_container</item>
+        <item name="colorAccent">@color/preset_green_primary</item>
+    </style>
+    <style name="ThemeOverlay.App.Orange" parent="">
+        <item name="colorPrimary">@color/preset_orange_primary</item>
+        <item name="colorOnPrimary">@color/preset_orange_on_primary</item>
+        <item name="colorPrimaryContainer">@color/preset_orange_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/preset_orange_on_primary_container</item>
+        <item name="colorAccent">@color/preset_orange_primary</item>
+    </style>
+    <style name="ThemeOverlay.App.Pink" parent="">
+        <item name="colorPrimary">@color/preset_pink_primary</item>
+        <item name="colorOnPrimary">@color/preset_pink_on_primary</item>
+        <item name="colorPrimaryContainer">@color/preset_pink_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/preset_pink_on_primary_container</item>
+        <item name="colorAccent">@color/preset_pink_primary</item>
+    </style>
 </resources>

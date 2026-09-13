@@ -47,6 +47,7 @@ public class ModDetailActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        com.maxjubayeryt.modbundle.utils.ThemeManager.apply(this);
         setContentView(R.layout.activity_mod_detail);
 
         downloader = new ModDownloader(this);

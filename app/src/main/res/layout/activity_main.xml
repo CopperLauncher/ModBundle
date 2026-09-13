@@ -334,6 +334,45 @@
                 android:textColor="?attr/colorOutline"
                 android:textSize="11sp"/>
 
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="16dp">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Use Material You (device wallpaper colors)"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="14sp"/>
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switch_dynamic_color"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"/>
+            </LinearLayout>
+
+            <!-- The actual, version-independent way to change the M3 accent color: a set of
+                 manual presets. Always shown — greyed out only conceptually when Material
+                 You is on, since that overrides it; kept enabled so it's ready the moment
+                 Material You is turned off, without needing to reopen Settings. -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Color Theme"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="13sp"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="6dp"/>
+            <Spinner
+                android:id="@+id/spinner_color_preset"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:background="@drawable/bg_spinner"
+                android:popupBackground="?attr/colorSurfaceContainer"
+                android:spinnerMode="dropdown"/>
+
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
