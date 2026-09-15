@@ -115,9 +115,9 @@ public class MainActivity extends AppCompatActivity {
         requestStoragePermissionIfNeeded();
         initViews();
         setupBottomNav();
+        setupBrowseRecycler();
         setupFilters();
         setupSearch();
-        setupBrowseRecycler();
         btnFilter.setOnClickListener(v -> showFilterDialog());
         setupInstalledRecycler();
         setupSettings();
