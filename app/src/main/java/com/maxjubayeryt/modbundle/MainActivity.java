@@ -78,6 +78,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView installedTabMods, installedTabShaders, installedTabResourcepacks, tvInstalledCount;
     private String currentInstalledType = "mods";
     private android.widget.Button btnCheckUpdates;
+    private android.widget.Button btnUpdateAll;
     private boolean includeSnapshots = false;
     private RecyclerView instancesRecycler;
     private String pendingLogoInstancePath;
@@ -168,6 +169,7 @@ public class MainActivity extends AppCompatActivity {
         installedTabResourcepacks = findViewById(R.id.installed_tab_resourcepacks);
         tvInstalledCount = findViewById(R.id.tv_installed_count);
         btnCheckUpdates = findViewById(R.id.btn_check_updates);
+        btnUpdateAll = findViewById(R.id.btn_update_all);
     }
 
     private void setupBottomNav() {
@@ -584,6 +586,14 @@ public class MainActivity extends AppCompatActivity {
         installedAdapter.setOnSwitchVersionListener(this::showSwitchVersionDialog);
 
         btnCheckUpdates.setOnClickListener(v -> checkUpdates());
+        btnUpdateAll.setOnClickListener(v -> {
+            for (Object mod : new java.util.ArrayList<>(installedMods)) {
+                String fileName = (mod instanceof androidx.documentfile.provider.DocumentFile)
+                        ? ((androidx.documentfile.provider.DocumentFile) mod).getName() : ((java.io.File) mod).getName();
+                com.maxjubayeryt.modbundle.utils.ModMetadata meta = fileName != null ? installedAdapter.getMetaCache().get(fileName) : null;
+                if (meta != null && meta.hasUpdate) performUpdate(mod, meta);
+            }
+        });
 
         installedRecycler.setLayoutManager(new LinearLayoutManager(this));
         installedRecycler.setHasFixedSize(true);
@@ -698,7 +708,10 @@ public class MainActivity extends AppCompatActivity {
 
         currentQuery = searchInput.getText().toString().trim();
         String version = getSelectedVersion();
-        String loader  = getSelectedLoader();
+        // Resource packs and shader packs have no mod-loader tag on Modrinth/CurseForge —
+        // their versions aren't Fabric/Forge/etc-specific — so passing the loader filter
+        // for them returns zero results instead of "no filter applied". Only mods use it.
+        String loader  = "mod".equals(currentProjectType) ? getSelectedLoader() : "";
 
         if (useCurseForge) {
             curseForgeApi.searchMods(currentQuery, version, loader, currentOffset, currentProjectType, results -> {
@@ -933,6 +946,7 @@ public class MainActivity extends AppCompatActivity {
     private void checkUpdates() {
         btnCheckUpdates.setEnabled(false);
         btnCheckUpdates.setText("Checking...");
+        if (btnUpdateAll != null) btnUpdateAll.setVisibility(View.GONE);
         installedAdapter.getMetaCache().clear();
         installedAdapter.notifyDataSetChanged();
 
@@ -954,6 +968,11 @@ public class MainActivity extends AppCompatActivity {
         }
         if (iMcVer.isEmpty()) iMcVer = getSelectedVersion();
         if (iLoader.isEmpty()) iLoader = getSelectedLoader();
+        // Resource packs and shader packs don't carry mod-loader tags on Modrinth (their
+        // versions are loader-less), so filtering their update lookup by e.g. "fabric"
+        // silently returns zero matches — which is why updates never showed up for those
+        // two content types. Only mods get the loader filter.
+        if (!"mods".equals(currentInstalledType)) iLoader = "";
         final String checkVer = iMcVer;
         final String checkLoad = iLoader;
 
@@ -1003,6 +1022,7 @@ public class MainActivity extends AppCompatActivity {
     private void finishCheckUpdates(int updatesFound) {
         handler.post(() -> {
             if (btnCheckUpdates != null) { btnCheckUpdates.setEnabled(true); btnCheckUpdates.setText("Check Updates"); }
+            if (btnUpdateAll != null) btnUpdateAll.setVisibility(updatesFound > 0 ? View.VISIBLE : View.GONE);
             if (pendingMetaCacheRefresh != null) { handler.removeCallbacks(pendingMetaCacheRefresh); pendingMetaCacheRefresh = null; }
             installedAdapter.notifyDataSetChanged();
         });
@@ -1195,8 +1215,18 @@ public class MainActivity extends AppCompatActivity {
         // captured up front so a stale result from a since-abandoned tab switch is dropped
         // instead of overwriting the list for whichever tab is now showing.
         final String requestedType = currentInstalledType;
-        installedLoading.setVisibility(View.VISIBLE);
-        emptyInstalled.setVisibility(View.GONE);
+        // Only show the loading placeholder for a genuinely empty first load. For a quick
+        // refresh after pausing/updating/deleting one item, the list already has data —
+        // showing the recycler AND the loading placeholder at the same time (both as
+        // weight=1 siblings) is exactly what was splitting the screen in half with a
+        // spinner floating below a truncated list. Those quick refreshes now just update
+        // the list in place with no visual interruption at all.
+        boolean coldLoad = installedMods.isEmpty();
+        if (coldLoad) {
+            installedLoading.setVisibility(View.VISIBLE);
+            installedRecycler.setVisibility(View.GONE);
+            emptyInstalled.setVisibility(View.GONE);
+        }
         sBgExecutor.execute(() -> {
             List<Object> collected = new ArrayList<>();
             try {
@@ -1247,6 +1277,7 @@ public class MainActivity extends AppCompatActivity {
             handler.post(() -> {
                 if (!requestedType.equals(currentInstalledType)) return; // user switched tabs while this was loading
                 installedLoading.setVisibility(View.GONE);
+                installedRecycler.setVisibility(View.VISIBLE);
                 installedMods.clear();
                 installedMods.addAll(collected);
                 installedAdapter.notifyDataSetChanged();

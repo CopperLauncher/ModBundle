@@ -187,6 +187,18 @@
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="12sp"/>
                 <Button
+                    android:id="@+id/btn_update_all"
+                    android:layout_width="wrap_content"
+                    android:layout_height="30dp"
+                    android:text="Update All"
+                    android:textColor="?attr/colorOnPrimary"
+                    android:textSize="11sp"
+                    android:backgroundTint="?attr/colorPrimary"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:layout_marginEnd="6dp"
+                    android:visibility="gone"/>
+                <Button
                     android:id="@+id/btn_check_updates"
                     android:layout_width="wrap_content"
                     android:layout_height="30dp"

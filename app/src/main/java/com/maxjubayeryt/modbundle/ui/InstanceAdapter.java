@@ -108,14 +108,14 @@ public class InstanceAdapter extends RecyclerView.Adapter<InstanceAdapter.ViewHo
                 try {
                     holder.logo.setImageURI(Uri.parse(logoName));
                 } catch (Exception e) {
-                    holder.logo.setImageResource(R.drawable.ic_launcher_monochrome);
+                    holder.logo.setImageResource(R.drawable.ic_mod_default);
                 }
             } else {
                 int resId = ctx.getResources().getIdentifier(logoName, "drawable", ctx.getPackageName());
-                holder.logo.setImageResource(resId != 0 ? resId : R.drawable.ic_launcher_monochrome);
+                holder.logo.setImageResource(resId != 0 ? resId : R.drawable.ic_mod_default);
             }
         } else {
-            holder.logo.setImageResource(R.drawable.ic_launcher_monochrome);
+            holder.logo.setImageResource(R.drawable.ic_mod_default);
         }
 
         // Active state - show Selected button differently
