@@ -36,6 +36,9 @@ public class InstalledModsAdapter extends RecyclerView.Adapter<InstalledModsAdap
 
     // Cache metadata per filename
     private final Map<String, ModMetadata> metaCache = new HashMap<>();
+    // Filenames currently being updated — shown with an inline spinner instead of the
+    // update button, instead of blocking the whole screen with a dialog per update.
+    private final java.util.Set<String> updatingFiles = new java.util.HashSet<>();
     // Track selected items
     private final List<Object> selectedMods = new ArrayList<>();
 
@@ -48,6 +51,18 @@ public class InstalledModsAdapter extends RecyclerView.Adapter<InstalledModsAdap
     }
 
     public void setOnSwitchVersionListener(OnSwitchVersionListener listener) { this.switchVersionListener = listener; }
+
+    /** Toggles the inline per-row update spinner for a filename, in place of the update button. */
+    public void setUpdating(String filename, boolean updating) {
+        if (updating) updatingFiles.add(filename); else updatingFiles.remove(filename);
+        int index = -1;
+        for (int i = 0; i < mods.size(); i++) {
+            Object m = mods.get(i);
+            String name = (m instanceof File) ? ((File) m).getName() : (m instanceof DocumentFile) ? ((DocumentFile) m).getName() : null;
+            if (filename.equals(name)) { index = i; break; }
+        }
+        if (index >= 0) notifyItemChanged(index);
+    }
 
 
     public void setShowDisable(boolean show) { this.showDisable = show; }
@@ -122,12 +137,19 @@ public class InstalledModsAdapter extends RecyclerView.Adapter<InstalledModsAdap
         holder.typeBadge.setTextColor(isDisabled ? com.maxjubayeryt.modbundle.utils.ThemeColors.onSurfaceVariant(holder.typeBadge) : com.maxjubayeryt.modbundle.utils.ThemeColors.success(holder.typeBadge));
         holder.itemView.setAlpha(isDisabled ? 0.5f : 1f);
 
-        // Update badge
+        // Update badge — shows an inline spinner in place of the button while this
+        // specific file's update download is running, instead of a blocking dialog.
         ModMetadata meta = metaCache.get(name);
-        if (meta != null && meta.hasUpdate) {
+        boolean isUpdating = updatingFiles.contains(name);
+        if (isUpdating) {
+            holder.btnUpdate.setVisibility(View.GONE);
+            holder.progressUpdate.setVisibility(View.VISIBLE);
+        } else if (meta != null && meta.hasUpdate) {
+            holder.progressUpdate.setVisibility(View.GONE);
             holder.btnUpdate.setVisibility(View.VISIBLE);
             holder.btnUpdate.setOnClickListener(v -> { if (updateListener != null) updateListener.onUpdate(modRef, meta); });
         } else {
+            holder.progressUpdate.setVisibility(View.GONE);
             holder.btnUpdate.setVisibility(View.GONE);
         }
 
@@ -163,6 +185,7 @@ public class InstalledModsAdapter extends RecyclerView.Adapter<InstalledModsAdap
         android.widget.ImageView icon;
         TextView name, size, typeBadge;
         ImageButton btnDelete, btnDisable, btnUpdate, btnSwitchVersion;
+        com.google.android.material.progressindicator.CircularProgressIndicator progressUpdate;
         ViewHolder(View v) {
             super(v);
             checkbox = v.findViewById(R.id.mod_checkbox);
@@ -174,6 +197,7 @@ public class InstalledModsAdapter extends RecyclerView.Adapter<InstalledModsAdap
             btnDisable = v.findViewById(R.id.btn_disable_mod);
             btnUpdate = v.findViewById(R.id.btn_update_mod);
             btnSwitchVersion = v.findViewById(R.id.btn_switch_version);
+            progressUpdate = v.findViewById(R.id.progress_update_mod);
         }
     }
 }

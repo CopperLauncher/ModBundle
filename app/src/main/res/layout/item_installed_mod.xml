@@ -94,6 +94,17 @@
         android:visibility="gone"
         android:layout_marginEnd="4dp"/>
 
+    <!-- Shown in place of btn_update_mod while an update download is in progress, so
+         updating a single mod doesn't need a blocking dialog — see setUpdating() in
+         InstalledModsAdapter. -->
+    <com.google.android.material.progressindicator.CircularProgressIndicator
+        android:id="@+id/progress_update_mod"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_marginEnd="14dp"
+        android:indeterminate="true"
+        android:visibility="gone"/>
+
     <!-- Disable button -->
     <ImageButton
         android:id="@+id/btn_disable_mod"

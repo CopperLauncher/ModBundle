@@ -187,6 +187,20 @@ public class MainActivity extends AppCompatActivity {
             }
             return false;
         });
+        // BottomNavigationView saves/restores its own selected item across recreate()
+        // (theme switching, rotation) automatically — but that restoration happens via
+        // onRestoreInstanceState, which never fires the listener above, so the tab
+        // *content* was staying on whatever layoutBrowse's default XML visibility was
+        // while the nav bar itself showed a different tab as selected. Since Android
+        // doesn't refire the listener for tapping an already-selected item, that left
+        // the previously-open tab (Settings, most noticeably) permanently stuck until a
+        // full app restart. Syncing content to the nav's actual selected item right here
+        // covers both a fresh launch (defaults to Browse) and a restored one.
+        int selectedId = nav.getSelectedItemId();
+        if (selectedId == R.id.nav_installed) { showTab("installed"); refreshInstalled(); }
+        else if (selectedId == R.id.nav_instances) showTab("instances");
+        else if (selectedId == R.id.nav_settings) showTab("settings");
+        else showTab("browse");
     }
 
     private void showTab(String tab) {
@@ -1163,27 +1177,32 @@ public class MainActivity extends AppCompatActivity {
 
     private void performUpdate(Object mod, com.maxjubayeryt.modbundle.utils.ModMetadata meta) {
         if (meta.latestFileUrl == null) return;
+        String oldFileName = (mod instanceof androidx.documentfile.provider.DocumentFile)
+                ? ((androidx.documentfile.provider.DocumentFile) mod).getName() : ((java.io.File) mod).getName();
         com.maxjubayeryt.modbundle.model.ModVersion.VersionFile file = new com.maxjubayeryt.modbundle.model.ModVersion.VersionFile();
         file.url = meta.latestFileUrl; file.filename = meta.latestFileName; file.primary = true;
         if (mod instanceof androidx.documentfile.provider.DocumentFile) ((androidx.documentfile.provider.DocumentFile) mod).delete();
         else if (mod instanceof java.io.File) ((java.io.File) mod).delete();
 
-        com.maxjubayeryt.modbundle.ui.M3ProgressDialog progress = new com.maxjubayeryt.modbundle.ui.M3ProgressDialog(this);
-        progress.setTitle("Updating...");
-        progress.show();
+        // Inline per-row spinner instead of a dialog that blocks the whole screen for one
+        // mod's update — see setUpdating() in InstalledModsAdapter.
+        if (oldFileName != null) installedAdapter.setUpdating(oldFileName, true);
 
         com.maxjubayeryt.modbundle.utils.ModDownloader.DownloadCallback callback = new com.maxjubayeryt.modbundle.utils.ModDownloader.DownloadCallback() {
             public void onProgress(String fileName, int percent) {}
             public void onSuccess(String fileName) {
                 handler.post(() -> {
-                    progress.dismiss();
+                    if (oldFileName != null) installedAdapter.setUpdating(oldFileName, false);
                     // Remove this mod's update entry from cache
                     installedAdapter.getMetaCache().remove(meta.latestFileName);
                     refreshInstalled();
                     Toast.makeText(MainActivity.this, "Updated!", Toast.LENGTH_SHORT).show();
                 });
             }
-            public void onError(String error) { handler.post(() -> { progress.dismiss(); Toast.makeText(MainActivity.this, "Update failed", Toast.LENGTH_SHORT).show(); }); }
+            public void onError(String error) { handler.post(() -> {
+                if (oldFileName != null) installedAdapter.setUpdating(oldFileName, false);
+                Toast.makeText(MainActivity.this, "Update failed", Toast.LENGTH_SHORT).show();
+            }); }
         };
         // Get instance loader/version for correct update download
         String upLoader = "", upVersion = "";
@@ -1197,12 +1216,16 @@ public class MainActivity extends AppCompatActivity {
         }
         final String finalUpLoader = upLoader.isEmpty() ? getSelectedLoader() : upLoader;
         final String finalUpVersion = upVersion.isEmpty() ? getSelectedVersion() : upVersion;
+        // Was hardcoded to "mods" here regardless of which tab the update came from — an
+        // update for a resource pack or shader pack was silently re-downloaded into the
+        // mods folder instead of its own. currentInstalledType is the actual destination.
+        final String destType = currentInstalledType;
 
         if (instanceUri != null && "content".equals(instanceUri.getScheme())) {
-            downloader.downloadMod(file, instanceUri, "mods", null, finalUpVersion, finalUpLoader, callback);
+            downloader.downloadMod(file, instanceUri, destType, null, finalUpVersion, finalUpLoader, callback);
         } else {
             java.io.File instanceDir = getLegacyInstanceDir();
-            if (instanceDir != null) downloader.downloadMod(file, new java.io.File(instanceDir, "mods"), null, finalUpVersion, finalUpLoader, callback);
+            if (instanceDir != null) downloader.downloadMod(file, new java.io.File(instanceDir, destType), null, finalUpVersion, finalUpLoader, callback);
         }
     }
 
