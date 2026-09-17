@@ -13,7 +13,6 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import com.bumptech.glide.Glide;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.maxjubayeryt.modbundle.api.CurseForgeApi;
@@ -72,10 +71,12 @@ public class ModDetailActivity extends AppCompatActivity {
 
         ImageView icon = findViewById(R.id.detail_icon);
         if (icon != null) {
-            if (mod.iconUrl != null && !mod.iconUrl.isEmpty()) {
-                Glide.with(this).load(mod.iconUrl).placeholder(R.drawable.ic_mod_default).into(icon);
-            } else {
-                icon.setImageResource(R.drawable.ic_mod_default);
+            icon.setImageResource(R.drawable.ic_mod_default);
+            if (mod.iconUrl != null && !mod.iconUrl.isEmpty() && mod.projectId != null) {
+                com.maxjubayeryt.modbundle.utils.RemoteIconCache.get(this)
+                        .getIcon(mod.source + ":" + mod.projectId, mod.iconUrl, bitmap -> {
+                            if (bitmap != null) icon.setImageBitmap(bitmap);
+                        });
             }
         }
 

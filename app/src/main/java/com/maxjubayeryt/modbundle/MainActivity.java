@@ -490,10 +490,22 @@ public class MainActivity extends AppCompatActivity {
 
             String version = getSelectedVersion();
             String loader = "mod".equals(currentProjectType) ? getSelectedLoader() : "";
-            // CurseForge's file list needs a second call per file to resolve anything
-            // comparable, so for now only Modrinth-sourced rows get the Update state;
-            // CF rows stay on "Installed" rather than firing an extra round trip each.
-            if ("curseforge".equals(mod.source)) { callback.accept(ModAdapter.RowState.INSTALLED); return; }
+
+            if ("curseforge".equals(mod.source)) {
+                // getFiles() already returns the full file list newest-first, so the state
+                // is just "does the newest file match what's recorded as installed" — no
+                // second network call needed like the switch-version dialog's per-file
+                // download-url resolution requires.
+                curseForgeApi.getFiles(mod.projectId, version, loader, files -> handler.post(() -> {
+                    if (files == null || files.isEmpty() || !files.get(0).has("fileName")) {
+                        callback.accept(ModAdapter.RowState.INSTALLED); return;
+                    }
+                    String newestFileName = files.get(0).get("fileName").getAsString();
+                    boolean isCurrent = newestFileName == null || newestFileName.equals(installedFile);
+                    callback.accept(isCurrent ? ModAdapter.RowState.INSTALLED : ModAdapter.RowState.UPDATE);
+                }), err -> handler.post(() -> callback.accept(ModAdapter.RowState.INSTALLED)));
+                return;
+            }
 
             api.getVersions(mod.projectId, version, loader, versions -> handler.post(() -> {
                 if (versions == null || versions.isEmpty()) { callback.accept(ModAdapter.RowState.INSTALLED); return; }

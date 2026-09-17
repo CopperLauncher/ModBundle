@@ -11,10 +11,10 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.bumptech.glide.Glide;
 import com.maxjubayeryt.modbundle.R;
 import com.maxjubayeryt.modbundle.model.ModResult;
 import com.maxjubayeryt.modbundle.utils.InstalledIndex;
+import com.maxjubayeryt.modbundle.utils.RemoteIconCache;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -108,10 +108,11 @@ public class ModAdapter extends RecyclerView.Adapter<ModAdapter.ModViewHolder> {
         holder.description.setText(mod.description);
         holder.downloads.setText(formatDownloads(mod.downloads) + " downloads");
 
-        if (mod.iconUrl != null && !mod.iconUrl.isEmpty()) {
-            Glide.with(context).load(mod.iconUrl)
-                    .placeholder(R.drawable.ic_mod_default)
-                    .into(holder.icon);
+        if (mod.iconUrl != null && !mod.iconUrl.isEmpty() && mod.projectId != null) {
+            holder.icon.setImageResource(R.drawable.ic_mod_default);
+            RemoteIconCache.get(context).getIcon(mod.source + ":" + mod.projectId, mod.iconUrl, bitmap -> {
+                if (bitmap != null) holder.icon.setImageBitmap(bitmap);
+            });
         } else {
             holder.icon.setImageResource(R.drawable.ic_mod_default);
         }
