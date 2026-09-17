@@ -9,11 +9,14 @@ import android.content.SharedPreferences;
  * search screen does — without a per-row network lookup.
  *
  * Copper resolves this by hashing the local jars (see ModsInstallApi / installedVersionIndex),
- * which is accurate but costs a hash + API round trip per file. Here that path still exists
- * for files the app didn't install itself (ContentUpdateChecker does exactly that hash
- * lookup during Check Updates, and calls {@link #record} with what it finds). This index is
- * the cheap fast path on top of it: anything installed through the app is recorded at
- * download time, so it's known instantly on every later browse.
+ * which is accurate but costs a hash + API round trip per file. This index is the cheap fast
+ * path instead: anything installed through the app is recorded at download time, so it's
+ * known instantly on every later browse, with no network call per row.
+ *
+ * The trade-off is that files the app didn't install itself (copied in manually, or
+ * installed before this index existed) aren't in here, so their browse rows read "Install"
+ * until they're installed through the app once. The switch-version dialog doesn't rely on
+ * this — it identifies the installed version by hashing, the same way Copper does.
  *
  * Entries are keyed per instance, since the same project can be installed in one instance
  * and not another.

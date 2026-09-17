@@ -481,7 +481,28 @@ public class MainActivity extends AppCompatActivity {
      */
     /** Points the browse adapter at the install index for whichever instance is active. */
     private void refreshInstallIndexBinding() {
-        if (modAdapter != null) modAdapter.setInstalledIndex(installedIndex, getActiveInstancePath());
+        if (modAdapter == null) return;
+        modAdapter.setInstalledIndex(installedIndex, getActiveInstancePath());
+        modAdapter.setInstallStateResolver((mod, callback) -> {
+            String instanceKey = getActiveInstancePath();
+            String installedFile = installedIndex.getInstalledFileName(instanceKey, mod.projectId);
+            if (installedFile == null) { callback.accept(ModAdapter.RowState.INSTALLED); return; }
+
+            String version = getSelectedVersion();
+            String loader = "mod".equals(currentProjectType) ? getSelectedLoader() : "";
+            // CurseForge's file list needs a second call per file to resolve anything
+            // comparable, so for now only Modrinth-sourced rows get the Update state;
+            // CF rows stay on "Installed" rather than firing an extra round trip each.
+            if ("curseforge".equals(mod.source)) { callback.accept(ModAdapter.RowState.INSTALLED); return; }
+
+            api.getVersions(mod.projectId, version, loader, versions -> handler.post(() -> {
+                if (versions == null || versions.isEmpty()) { callback.accept(ModAdapter.RowState.INSTALLED); return; }
+                ModVersion.VersionFile newest = ModDownloader.getPrimaryFile(versions.get(0));
+                boolean isCurrent = newest == null || newest.filename == null
+                        || newest.filename.equals(installedFile);
+                callback.accept(isCurrent ? ModAdapter.RowState.INSTALLED : ModAdapter.RowState.UPDATE);
+            }), err -> handler.post(() -> callback.accept(ModAdapter.RowState.INSTALLED)));
+        });
     }
 
     /**
@@ -529,14 +550,21 @@ public class MainActivity extends AppCompatActivity {
                                   String versionLabel, String gameVersion, String loader) {
         String destType = "mod".equals(currentProjectType) ? "mods"
                 : "resourcepack".equals(currentProjectType) ? "resourcepacks" : "shaderpacks";
+        // If this project is already installed under a different filename, this install is
+        // really an update — the superseded file has to be removed once the new one lands,
+        // or both versions would sit in the folder at once.
+        final String supersededFile = installedIndex.getInstalledFileName(getActiveInstancePath(), projectId);
 
         ModDownloader.DownloadCallback callback = new ModDownloader.DownloadCallback() {
             public void onProgress(String fileName, int percent) {}
             public void onSuccess(String fileName) {
                 handler.post(() -> {
                     modAdapter.setInstalling(projectId, false);
+                    if (supersededFile != null && !supersededFile.equals(file.filename)) {
+                        deleteInstalledFileByName(destType, supersededFile);
+                    }
                     installedIndex.record(getActiveInstancePath(), projectId, file.filename, versionLabel);
-                    modAdapter.notifyDataSetChanged();
+                    modAdapter.clearStateCache();
                     Toast.makeText(MainActivity.this, "Installed " + file.filename, Toast.LENGTH_SHORT).show();
                 });
             }
@@ -553,6 +581,32 @@ public class MainActivity extends AppCompatActivity {
             if (instanceDir == null) { failQuickInstall(projectId, "No instance folder set"); return; }
             downloader.downloadMod(file, new java.io.File(instanceDir, destType), null, gameVersion, loader, callback);
         }
+    }
+
+    /**
+     * Deletes one file by name from a subfolder of the active instance, handling both SAF
+     * and legacy-file instances. Used to remove the version a browse-row update replaces.
+     */
+    private void deleteInstalledFileByName(String subFolder, String fileName) {
+        try {
+            Uri instanceUri = prefs.getInstanceUri();
+            if (instanceUri != null && "content".equals(instanceUri.getScheme())) {
+                androidx.documentfile.provider.DocumentFile dir =
+                        androidx.documentfile.provider.DocumentFile.fromTreeUri(this, instanceUri);
+                if (dir == null) return;
+                androidx.documentfile.provider.DocumentFile sub = dir.findFile(subFolder);
+                if (sub == null) return;
+                androidx.documentfile.provider.DocumentFile target = sub.findFile(fileName);
+                if (target == null) target = sub.findFile(fileName + ".disabled");
+                if (target != null) target.delete();
+            } else {
+                java.io.File instanceDir = getLegacyInstanceDir();
+                if (instanceDir == null) return;
+                java.io.File target = new java.io.File(new java.io.File(instanceDir, subFolder), fileName);
+                if (!target.exists()) target = new java.io.File(new java.io.File(instanceDir, subFolder), fileName + ".disabled");
+                if (target.exists()) target.delete();
+            }
+        } catch (Exception ignored) { }
     }
 
     private void failQuickInstall(String projectId, String message) {
@@ -674,7 +728,7 @@ public class MainActivity extends AppCompatActivity {
                             // showing "Installed" for a project whose file is now gone.
                             installedIndex.forgetByFileName(getActiveInstancePath(), modName);
                             refreshInstalled();
-                            if (modAdapter != null) modAdapter.notifyDataSetChanged();
+                            if (modAdapter != null) modAdapter.clearStateCache();
                             Toast.makeText(this, "Removed", Toast.LENGTH_SHORT).show();
                         }
                     })
@@ -1651,6 +1705,8 @@ public class MainActivity extends AppCompatActivity {
                     currentGameVersion = versionSel != null ? versionSel.toString() : "Any";
                     includeSnapshots = swSnapshots.isChecked();
                     saveFilters();
+                    // Install/Update states were resolved against the previous filter.
+                    if (modAdapter != null) modAdapter.clearStateCache();
                     searchMods(true);
                 })
                 .setNegativeButton("Cancel", null)

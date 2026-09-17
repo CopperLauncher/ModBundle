@@ -16,8 +16,10 @@ import com.maxjubayeryt.modbundle.R;
 import com.maxjubayeryt.modbundle.model.ModResult;
 import com.maxjubayeryt.modbundle.utils.InstalledIndex;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class ModAdapter extends RecyclerView.Adapter<ModAdapter.ModViewHolder> {
@@ -25,6 +27,18 @@ public class ModAdapter extends RecyclerView.Adapter<ModAdapter.ModViewHolder> {
     public interface OnInstallClickListener {
         void onInstallClick(ModResult mod);
         default void onModClick(ModResult mod) { onInstallClick(mod); }
+    }
+
+    /** Button states, mirroring Copper's InstallButtonState. */
+    public enum RowState { INSTALL, INSTALLED, UPDATE }
+
+    /**
+     * Resolves whether an already-installed project has a newer version available. Only
+     * called for rows that are actually installed (usually a handful per screen), and the
+     * result is cached, so browsing doesn't fire a lookup per row.
+     */
+    public interface InstallStateResolver {
+        void resolve(ModResult mod, java.util.function.Consumer<RowState> callback);
     }
 
     private final List<ModResult> mods;
@@ -36,6 +50,11 @@ public class ModAdapter extends RecyclerView.Adapter<ModAdapter.ModViewHolder> {
     private String instanceKey;
     // Projects whose install is currently running, shown with a spinner in place of the button.
     private final Set<String> installingProjects = new HashSet<>();
+    // Resolved Installed-vs-Update state per project, plus in-flight guards so the same
+    // project isn't looked up repeatedly as rows are recycled during scrolling.
+    private final Map<String, RowState> stateCache = new HashMap<>();
+    private final Set<String> statePending = new HashSet<>();
+    private InstallStateResolver stateResolver;
 
     public ModAdapter(Context ctx, List<ModResult> mods, OnInstallClickListener listener) {
         this.context = ctx;
@@ -47,6 +66,21 @@ public class ModAdapter extends RecyclerView.Adapter<ModAdapter.ModViewHolder> {
     public void setInstalledIndex(InstalledIndex index, String instanceKey) {
         this.installedIndex = index;
         this.instanceKey = instanceKey;
+        clearStateCache();
+    }
+
+    public void setInstallStateResolver(InstallStateResolver resolver) {
+        this.stateResolver = resolver;
+    }
+
+    /**
+     * Drops resolved Install/Update states. Must be called whenever something that could
+     * change them changes — the active instance, the version/loader filter, or a completed
+     * install — otherwise rows would keep showing a stale button label.
+     */
+    public void clearStateCache() {
+        stateCache.clear();
+        statePending.clear();
         notifyDataSetChanged();
     }
 
@@ -91,10 +125,31 @@ public class ModAdapter extends RecyclerView.Adapter<ModAdapter.ModViewHolder> {
         } else {
             holder.installProgress.setVisibility(View.GONE);
             holder.installButton.setVisibility(View.VISIBLE);
-            holder.installButton.setText(installed ? "Installed" : "Install");
+
+            RowState state = !installed ? RowState.INSTALL
+                    : stateCache.getOrDefault(mod.projectId, RowState.INSTALLED);
+            switch (state) {
+                case UPDATE:    holder.installButton.setText("Update");    break;
+                case INSTALLED: holder.installButton.setText("Installed"); break;
+                default:        holder.installButton.setText("Install");   break;
+            }
             // "Installed" stays tappable so it can be used to reinstall/switch, matching
             // Copper — it's a state label, not a disabled button.
             holder.installButton.setOnClickListener(v -> listener.onInstallClick(mod));
+
+            // Kick off the Installed-vs-Update lookup once per project, lazily.
+            if (installed && stateResolver != null && mod.projectId != null
+                    && !stateCache.containsKey(mod.projectId) && !statePending.contains(mod.projectId)) {
+                statePending.add(mod.projectId);
+                stateResolver.resolve(mod, resolved -> {
+                    statePending.remove(mod.projectId);
+                    if (resolved == null) return;
+                    stateCache.put(mod.projectId, resolved);
+                    for (int i = 0; i < mods.size(); i++) {
+                        if (mod.projectId.equals(mods.get(i).projectId)) { notifyItemChanged(i); break; }
+                    }
+                });
+            }
         }
 
         // Open detail on card click
