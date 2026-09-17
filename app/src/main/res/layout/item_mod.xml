@@ -54,4 +54,35 @@
 
     </LinearLayout>
 
+    <!-- Per-row install control, so installing the version matching the current filter
+         doesn't require opening the detail screen first. Label reflects install state
+         (Install / Installed / Update), matching Copper's search screen. -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:layout_marginStart="8dp">
+
+        <Button
+            android:id="@+id/btn_row_install"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:minWidth="84dp"
+            android:text="Install"
+            android:textSize="11sp"
+            android:textColor="?attr/colorOnPrimary"
+            android:backgroundTint="?attr/colorPrimary"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:paddingHorizontal="10dp"/>
+
+        <com.google.android.material.progressindicator.CircularProgressIndicator
+            android:id="@+id/progress_row_install"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:indeterminate="true"
+            android:visibility="gone"/>
+    </LinearLayout>
+
 </LinearLayout>

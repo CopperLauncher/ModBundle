@@ -30,6 +30,17 @@
                 android:maxLines="1"
                 android:ellipsize="end"/>
             <TextView
+                android:id="@+id/version_incompatible_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Incompatible"
+                android:textSize="11sp"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="2dp"
+                android:background="@drawable/bg_mod_card"
+                android:layout_marginStart="8dp"
+                android:visibility="gone"/>
+            <TextView
                 android:id="@+id/version_type_badge"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

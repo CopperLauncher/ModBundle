@@ -1,7 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.recyclerview.widget.RecyclerView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/detail_versions_recycler"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="400dp"
-    android:paddingVertical="4dp"
-    android:clipToPadding="false"/>
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <!-- Toggles client-side visibility of versions that don't match the instance's game
+         version/loader, matching Copper's switch-version dialog. -->
+    <TextView
+        android:id="@+id/switch_version_toggle_incompatible"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Show incompatible versions"
+        android:textColor="?attr/colorPrimary"
+        android:textSize="12sp"
+        android:padding="12dp"
+        android:background="?attr/selectableItemBackground"/>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/detail_versions_recycler"
+        android:layout_width="match_parent"
+        android:layout_height="400dp"
+        android:paddingVertical="4dp"
+        android:clipToPadding="false"/>
+</LinearLayout>

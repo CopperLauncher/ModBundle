@@ -87,6 +87,7 @@ public class MainActivity extends AppCompatActivity {
     private final java.util.List<InstanceAdapter.InstanceEntry> instanceList = new ArrayList<>();
     private ModDownloader downloader;
     private com.maxjubayeryt.modbundle.utils.InstanceNameStore instanceNameStore;
+    private com.maxjubayeryt.modbundle.utils.InstalledIndex installedIndex;
     private PrefManager prefs;
     private final Handler handler = new Handler(Looper.getMainLooper());
     // Bounded pool for installed-list I/O and update checks — used instead of raw
@@ -113,6 +114,7 @@ public class MainActivity extends AppCompatActivity {
         prefs = new PrefManager(this);
         downloader = new ModDownloader(this);
         instanceNameStore = new com.maxjubayeryt.modbundle.utils.InstanceNameStore(this);
+        installedIndex = new com.maxjubayeryt.modbundle.utils.InstalledIndex(this);
         requestStoragePermissionIfNeeded();
         initViews();
         setupBottomNav();
@@ -174,33 +176,40 @@ public class MainActivity extends AppCompatActivity {
 
     private void setupBottomNav() {
         BottomNavigationView nav = findViewById(R.id.bottom_nav);
-        nav.setOnItemSelectedListener(item -> {
-            int id = item.getItemId();
-            if (id == R.id.nav_browse) {
-                showTab("browse"); return true;
-            } else if (id == R.id.nav_installed) {
-                showTab("installed"); refreshInstalled(); return true;
-            } else if (id == R.id.nav_instances) {
-                showTab("instances"); return true;
-            } else if (id == R.id.nav_settings) {
-                showTab("settings"); return true;
-            }
-            return false;
-        });
-        // BottomNavigationView saves/restores its own selected item across recreate()
-        // (theme switching, rotation) automatically — but that restoration happens via
-        // onRestoreInstanceState, which never fires the listener above, so the tab
-        // *content* was staying on whatever layoutBrowse's default XML visibility was
-        // while the nav bar itself showed a different tab as selected. Since Android
-        // doesn't refire the listener for tapping an already-selected item, that left
-        // the previously-open tab (Settings, most noticeably) permanently stuck until a
-        // full app restart. Syncing content to the nav's actual selected item right here
-        // covers both a fresh launch (defaults to Browse) and a restored one.
-        int selectedId = nav.getSelectedItemId();
-        if (selectedId == R.id.nav_installed) { showTab("installed"); refreshInstalled(); }
-        else if (selectedId == R.id.nav_instances) showTab("instances");
-        else if (selectedId == R.id.nav_settings) showTab("settings");
+        nav.setOnItemSelectedListener(item -> { showTabForNavId(item.getItemId()); return true; });
+        // Tapping the already-selected item doesn't fire the listener above, so without
+        // this a desynced tab (see syncTabToNav) could never be recovered by tapping it.
+        nav.setOnItemReselectedListener(item -> showTabForNavId(item.getItemId()));
+    }
+
+    private void showTabForNavId(int id) {
+        if (id == R.id.nav_installed) { showTab("installed"); refreshInstalled(); }
+        else if (id == R.id.nav_instances) showTab("instances");
+        else if (id == R.id.nav_settings) showTab("settings");
         else showTab("browse");
+    }
+
+    /**
+     * BottomNavigationView saves and restores its own selected item across recreate()
+     * (theme switching, rotation) — but that restoration happens in onRestoreInstanceState,
+     * which never fires the selection listener, so the tab *content* stayed on whatever
+     * layoutBrowse's default XML visibility was while the nav bar showed a different tab as
+     * selected. That's what left Settings unreachable without a full app restart after
+     * changing the theme in it.
+     *
+     * This has to run from onPostCreate rather than onCreate: onRestoreInstanceState runs
+     * between the two, so syncing during onCreate reads the pre-restoration selection and
+     * gets silently overwritten moments later.
+     */
+    private void syncTabToNav() {
+        BottomNavigationView nav = findViewById(R.id.bottom_nav);
+        if (nav != null) showTabForNavId(nav.getSelectedItemId());
+    }
+
+    @Override
+    protected void onPostCreate(Bundle savedInstanceState) {
+        super.onPostCreate(savedInstanceState);
+        syncTabToNav();
     }
 
     private void showTab(String tab) {
@@ -253,6 +262,7 @@ public class MainActivity extends AppCompatActivity {
             updateActiveInstanceLabel();
             instanceAdapter.setActiveInstancePath(path);
             applyInstanceFilters(path);
+            refreshInstallIndexBinding();
             Toast.makeText(this, "Active: " + name, Toast.LENGTH_SHORT).show();
             // Stay on instances tab
         });
@@ -469,6 +479,87 @@ public class MainActivity extends AppCompatActivity {
      * here so Browse's initial filter setup can use it too, without depending on
      * setupInstances() having already populated the instance list UI.
      */
+    /** Points the browse adapter at the install index for whichever instance is active. */
+    private void refreshInstallIndexBinding() {
+        if (modAdapter != null) modAdapter.setInstalledIndex(installedIndex, getActiveInstancePath());
+    }
+
+    /**
+     * Installs the newest version matching the current filter directly from the browse row,
+     * without opening the detail screen first. Shows an inline spinner on that row while it
+     * runs, and records the result so the row can immediately read "Installed".
+     */
+    private void quickInstall(ModResult mod) {
+        final String projectId = mod.projectId;
+        modAdapter.setInstalling(projectId, true);
+
+        String version = getSelectedVersion();
+        // Resource packs/shaders aren't loader-specific — same reason searchMods() skips it.
+        String loader = "mod".equals(currentProjectType) ? getSelectedLoader() : "";
+
+        if ("curseforge".equals(mod.source)) {
+            curseForgeApi.getFiles(projectId, version, loader, files -> handler.post(() -> {
+                if (files == null || files.isEmpty()) { failQuickInstall(projectId, "No matching version found"); return; }
+                com.google.gson.JsonObject f = files.get(0);
+                if (!f.has("id") || !f.has("fileName")) { failQuickInstall(projectId, "No matching version found"); return; }
+                String fileId = f.get("id").getAsString();
+                String fileName = f.get("fileName").getAsString();
+                curseForgeApi.getDownloadUrl(projectId, fileId, url -> handler.post(() -> {
+                    if (url == null || url.isEmpty()) {
+                        failQuickInstall(projectId, "This file can only be downloaded from CurseForge's site");
+                        return;
+                    }
+                    ModVersion.VersionFile vf = new ModVersion.VersionFile();
+                    vf.url = url; vf.filename = fileName; vf.primary = true;
+                    runQuickDownload(projectId, vf, fileName, version, loader);
+                }), err -> handler.post(() -> failQuickInstall(projectId, "Couldn't resolve download link")));
+            }), err -> handler.post(() -> failQuickInstall(projectId, "No matching version found")));
+        } else {
+            api.getVersions(projectId, version, loader, versions -> handler.post(() -> {
+                if (versions == null || versions.isEmpty()) { failQuickInstall(projectId, "No matching version found"); return; }
+                ModVersion latest = versions.get(0);
+                ModVersion.VersionFile vf = ModDownloader.getPrimaryFile(latest);
+                if (vf == null) { failQuickInstall(projectId, "No downloadable file"); return; }
+                runQuickDownload(projectId, vf, latest.versionNumber, version, loader);
+            }), err -> handler.post(() -> failQuickInstall(projectId, "Couldn't load versions")));
+        }
+    }
+
+    private void runQuickDownload(String projectId, ModVersion.VersionFile file,
+                                  String versionLabel, String gameVersion, String loader) {
+        String destType = "mod".equals(currentProjectType) ? "mods"
+                : "resourcepack".equals(currentProjectType) ? "resourcepacks" : "shaderpacks";
+
+        ModDownloader.DownloadCallback callback = new ModDownloader.DownloadCallback() {
+            public void onProgress(String fileName, int percent) {}
+            public void onSuccess(String fileName) {
+                handler.post(() -> {
+                    modAdapter.setInstalling(projectId, false);
+                    installedIndex.record(getActiveInstancePath(), projectId, file.filename, versionLabel);
+                    modAdapter.notifyDataSetChanged();
+                    Toast.makeText(MainActivity.this, "Installed " + file.filename, Toast.LENGTH_SHORT).show();
+                });
+            }
+            public void onError(String error) {
+                handler.post(() -> failQuickInstall(projectId, "Install failed: " + error));
+            }
+        };
+
+        Uri instanceUri = prefs.getInstanceUri();
+        if (instanceUri != null && "content".equals(instanceUri.getScheme())) {
+            downloader.downloadMod(file, instanceUri, destType, null, gameVersion, loader, callback);
+        } else {
+            java.io.File instanceDir = getLegacyInstanceDir();
+            if (instanceDir == null) { failQuickInstall(projectId, "No instance folder set"); return; }
+            downloader.downloadMod(file, new java.io.File(instanceDir, destType), null, gameVersion, loader, callback);
+        }
+    }
+
+    private void failQuickInstall(String projectId, String message) {
+        modAdapter.setInstalling(projectId, false);
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+    }
+
     private String getActiveInstancePath() {
         Uri activeUri = prefs.getInstanceUri();
         if (activeUri == null) return null;
@@ -525,7 +616,7 @@ public class MainActivity extends AppCompatActivity {
         modAdapter = new ModAdapter(this, modResults, new com.maxjubayeryt.modbundle.ui.ModAdapter.OnInstallClickListener() {
             public void onInstallClick(com.maxjubayeryt.modbundle.model.ModResult mod) {
                 if (!prefs.hasInstanceFolder()) { showFolderPickerPrompt(); return; }
-                showInstallDialog(mod);
+                quickInstall(mod);
             }
             public void onModClick(com.maxjubayeryt.modbundle.model.ModResult mod) {
                 if (!prefs.hasInstanceFolder()) { showFolderPickerPrompt(); return; }
@@ -544,6 +635,7 @@ public class MainActivity extends AppCompatActivity {
         browseRecycler.setHasFixedSize(true);
         browseRecycler.setNestedScrollingEnabled(false);
         browseRecycler.setAdapter(modAdapter);
+        refreshInstallIndexBinding();
         browseRecycler.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
@@ -577,7 +669,14 @@ public class MainActivity extends AppCompatActivity {
                         boolean deleted = (mod instanceof androidx.documentfile.provider.DocumentFile)
                             ? ((androidx.documentfile.provider.DocumentFile) mod).delete()
                             : ((java.io.File) mod).delete();
-                        if (deleted) { refreshInstalled(); Toast.makeText(this, "Removed", Toast.LENGTH_SHORT).show(); }
+                        if (deleted) {
+                            // Drop its install-index entry too, otherwise browse would keep
+                            // showing "Installed" for a project whose file is now gone.
+                            installedIndex.forgetByFileName(getActiveInstancePath(), modName);
+                            refreshInstalled();
+                            if (modAdapter != null) modAdapter.notifyDataSetChanged();
+                            Toast.makeText(this, "Removed", Toast.LENGTH_SHORT).show();
+                        }
                     })
                     .setNegativeButton("Cancel", null).show();
             },
@@ -1074,13 +1173,18 @@ public class MainActivity extends AppCompatActivity {
                 Toast.makeText(this, "Couldn't identify this file on Modrinth or CurseForge", Toast.LENGTH_LONG).show();
                 return;
             }
-            api.getVersions(projectId, getSelectedVersion(), getSelectedLoader(), versions -> handler.post(() -> {
+            // Fetched WITHOUT the game-version/loader filter on purpose: the dialog's
+            // "Show incompatible versions" toggle filters client-side, so incompatible
+            // versions have to actually be in the list to be revealable. Filtering them
+            // out server-side here is what would make that toggle do nothing.
+            api.getVersions(projectId, "", "", versions -> handler.post(() -> {
                 if (versions == null || versions.isEmpty()) {
                     Toast.makeText(this, "No versions found for this content", Toast.LENGTH_SHORT).show();
                     return;
                 }
                 View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_version_list, null);
                 RecyclerView recycler = dialogView.findViewById(R.id.detail_versions_recycler);
+                TextView toggleIncompatible = dialogView.findViewById(R.id.switch_version_toggle_incompatible);
                 recycler.setLayoutManager(new LinearLayoutManager(this));
                 AlertDialog dialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                         .setTitle("Switch version")
@@ -1090,6 +1194,18 @@ public class MainActivity extends AppCompatActivity {
                 VersionAdapter adapter = new VersionAdapter(versions, (version, file) -> {
                     dialog.dismiss();
                     switchInstalledContentVersion(mod, fileName, file);
+                });
+                // Marks which row is the currently installed one, so the buttons read
+                // Installed / Update / Downgrade rather than all saying the same thing.
+                adapter.setInstalledFileName(fileName);
+                adapter.setCompatibilityFilter(getSelectedVersion(),
+                        "mods".equals(currentInstalledType) ? getSelectedLoader() : "");
+                final boolean[] showIncompatible = {false};
+                toggleIncompatible.setOnClickListener(v -> {
+                    showIncompatible[0] = !showIncompatible[0];
+                    toggleIncompatible.setText(showIncompatible[0]
+                            ? "Hide incompatible versions" : "Show incompatible versions");
+                    adapter.setShowIncompatible(showIncompatible[0]);
                 });
                 recycler.setAdapter(adapter);
                 dialog.show();
