@@ -88,17 +88,22 @@ public class ContentUpdateChecker {
                 result.projectId = projectId;
                 result.currentVersionId = currentVersion.id;
                 result.source = "modrinth";
-                // Same file already installed — nothing to report, regardless of on-disk name.
-                if (currentVersion.id != null && currentVersion.id.equals(latest.id)) {
-                    callback.onResult(result); // hasUpdate stays false, identity is still set
-                    return;
+                // Same file already installed — still fetch the icon below, just skip the
+                // update fields. This was previously an early return with no icon fetch at
+                // all, which meant any already-up-to-date content (the common case — most
+                // installed files aren't mid-update most of the time) never got an icon.
+                // Shaders hit this on nearly every load since they have no local icon to
+                // fall back to first, unlike mods/resourcepacks.
+                boolean upToDate = currentVersion.id != null && currentVersion.id.equals(latest.id);
+                if (!upToDate) {
+                    ModVersion.VersionFile primary = ModDownloader.getPrimaryFile(latest);
+                    if (primary != null) {
+                        result.hasUpdate = true;
+                        result.latestVersionName = latest.versionNumber;
+                        result.latestFileUrl = primary.url;
+                        result.latestFileName = primary.filename;
+                    }
                 }
-                ModVersion.VersionFile primary = ModDownloader.getPrimaryFile(latest);
-                if (primary == null) { callback.onResult(result); return; }
-                result.hasUpdate = true;
-                result.latestVersionName = latest.versionNumber;
-                result.latestFileUrl = primary.url;
-                result.latestFileName = primary.filename;
                 fetchModrinthIcon(projectId, result, callback);
             }, e -> callback.onResult(null));
         }, e -> fallbackToCurseForge(bytes, callback));
