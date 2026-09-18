@@ -60,6 +60,17 @@ public class InstalledIndex {
         editor.apply();
     }
 
+    /** Whether some project is already recorded as installed under this exact filename. */
+    public boolean isFileNameIndexed(String instanceKey, String fileName) {
+        if (instanceKey == null || fileName == null) return false;
+        for (java.util.Map.Entry<String, ?> e : prefs.getAll().entrySet()) {
+            if (!e.getKey().startsWith(instanceKey + "|")) continue;
+            Object value = e.getValue();
+            if (value instanceof String && fileName.equals(((String) value).split("\u0000", -1)[0])) return true;
+        }
+        return false;
+    }
+
     public boolean isInstalled(String instanceKey, String projectId) {
         return getInstalledFileName(instanceKey, projectId) != null;
     }

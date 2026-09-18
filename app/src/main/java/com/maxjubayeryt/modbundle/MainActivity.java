@@ -804,9 +804,19 @@ public class MainActivity extends AppCompatActivity {
             spTheme.setAdapter(themeAdapter);
             spTheme.setSelection(prefs.getThemeMode());
             spTheme.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                boolean ready = false;
                 public void onItemSelected(AdapterView<?> a, View v, int position, long id) {
-                    if (!ready) { ready = true; return; }
+                    // setAdapter() fires an implicit selection for position 0, and the
+                    // setSelection() call above can fire a second one for the saved value —
+                    // both happen during setup, before any real user interaction. A "first
+                    // event is a phantom" flag only ever swallows ONE of those, so when the
+                    // saved mode isn't 0 (Dark, the app's default, is 2) the second spurious
+                    // event was read as a genuine change and called recreate() — which reruns
+                    // this exact setup on the new Activity, firing the same spurious event
+                    // again. That infinite loop is what caused the flickering and the
+                    // inability to leave Settings after switching themes. Comparing against
+                    // the actual saved value instead is robust regardless of how many setup
+                    // events fire, since none of them differ from what's already saved.
+                    if (position == prefs.getThemeMode()) return;
                     prefs.saveThemeMode(position);
                     // Recreating applies the new night mode immediately without losing the
                     // current tab/instance/search state (onCreate re-reads all of that).
@@ -841,9 +851,10 @@ public class MainActivity extends AppCompatActivity {
             spColorPreset.setAdapter(presetAdapter);
             spColorPreset.setSelection(prefs.getColorPreset());
             spColorPreset.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                boolean ready = false;
                 public void onItemSelected(AdapterView<?> a, View v, int position, long id) {
-                    if (!ready) { ready = true; return; }
+                    // See the matching comment on the theme spinner above — same fix for
+                    // the same infinite-recreate() cause.
+                    if (position == prefs.getColorPreset()) return;
                     prefs.saveColorPreset(position);
                     recreate();
                 }
@@ -1488,8 +1499,50 @@ public class MainActivity extends AppCompatActivity {
                 installedAdapter.notifyDataSetChanged();
                 if (tvInstalledCount != null) tvInstalledCount.setText(installedMods.size() + " files");
                 emptyInstalled.setVisibility(installedMods.isEmpty() ? View.VISIBLE : View.GONE);
+                backfillInstalledIndex(requestedType, collected);
             });
         });
+    }
+
+    /**
+     * Recognises content that was installed before InstalledIndex existed (or installed by
+     * something other than this app), so Browse can show Installed/Update for it too — not
+     * just for things installed through the app's own quick-install/download flow.
+     *
+     * Hash-identifies whichever installed files this instance doesn't already have an index
+     * entry for, the same way Check Updates does, and records what it finds. Runs quietly in
+     * the background; results land whenever they land; nothing here is time-critical since
+     * it's filling in *already-installed* state, not something a person is waiting on.
+     */
+    private void backfillInstalledIndex(String subFolder, List<Object> files) {
+        String instanceKey = getActiveInstancePath();
+        if (instanceKey == null || files.isEmpty()) return;
+        com.maxjubayeryt.modbundle.utils.ContentUpdateChecker checker = new com.maxjubayeryt.modbundle.utils.ContentUpdateChecker();
+        for (Object file : files) {
+            String fileName = (file instanceof androidx.documentfile.provider.DocumentFile)
+                    ? ((androidx.documentfile.provider.DocumentFile) file).getName() : ((java.io.File) file).getName();
+            if (fileName == null) continue;
+            String normalized = fileName.endsWith(".disabled") ? fileName.substring(0, fileName.length() - 9) : fileName;
+            // Already resolved to some project — skip re-hashing/re-resolving it on every
+            // refresh. Without this, opening the Installed tab after a disable/enable would
+            // re-run a hash + network lookup for every file in the folder each time.
+            if (installedIndex.isFileNameIndexed(instanceKey, normalized)) continue;
+            sBgExecutor.execute(() -> {
+                com.maxjubayeryt.modbundle.utils.ContentUpdateChecker.ResultCallback onResult = result -> {
+                    if (result == null || result.projectId == null) return;
+                    if (normalized.equals(installedIndex.getInstalledFileName(instanceKey, result.projectId))) return; // already known
+                    installedIndex.record(instanceKey, result.projectId, normalized, result.latestVersionName);
+                    handler.post(() -> { if (modAdapter != null) modAdapter.clearStateCache(); });
+                };
+                try {
+                    if (file instanceof androidx.documentfile.provider.DocumentFile) {
+                        checker.check(this, (androidx.documentfile.provider.DocumentFile) file, "", "", onResult);
+                    } else {
+                        checker.check((java.io.File) file, "", "", onResult);
+                    }
+                } catch (Exception ignored) { }
+            });
+        }
     }
 
     private java.io.File getLegacyInstanceDir() {

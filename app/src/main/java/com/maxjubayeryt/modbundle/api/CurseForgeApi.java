@@ -35,8 +35,9 @@ public class CurseForgeApi {
                 if (query != null && !query.isEmpty()) url.append("&searchFilter=").append(encode(query));
                 if (gameVersion != null && !gameVersion.isEmpty() && !gameVersion.equals("Any"))
                     url.append("&gameVersion=").append(encode(gameVersion));
+                int loaderCode = 0;
                 if (loader != null && !loader.isEmpty() && !loader.equals("Any")) {
-                    int loaderCode = loaderType(loader);
+                    loaderCode = loaderType(loader);
                     if (loaderCode != 0) {
                         url.append("&modLoaderType=").append(loaderCode);
                     }
@@ -77,6 +78,24 @@ public class CurseForgeApi {
                             if (links.has("websiteUrl") && !links.get("websiteUrl").isJsonNull()) {
                                 r.pageUrl = links.get("websiteUrl").getAsString();
                             }
+                        }
+                        // Client-side backstop for the loader filter: CurseForge's own docs
+                        // say modLoaderType is only honored server-side alongside a specific
+                        // gameVersion, so leaving gameVersion at "Any" while filtering by
+                        // loader was silently returning every loader's mods. Checking each
+                        // result's own file index here is correct regardless of what the
+                        // server actually did with the query params.
+                        if (loaderCode != 0 && mod.has("latestFilesIndexes")) {
+                            boolean matchesLoader = false;
+                            JsonArray fileIndexes = mod.getAsJsonArray("latestFilesIndexes");
+                            for (int j = 0; j < fileIndexes.size(); j++) {
+                                JsonObject idx = fileIndexes.get(j).getAsJsonObject();
+                                if (idx.has("modLoader") && !idx.get("modLoader").isJsonNull()
+                                        && idx.get("modLoader").getAsInt() == loaderCode) {
+                                    matchesLoader = true; break;
+                                }
+                            }
+                            if (!matchesLoader) continue;
                         }
                         results.add(r);
                     }

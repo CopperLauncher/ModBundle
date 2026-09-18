@@ -42,6 +42,12 @@ public class ContentUpdateChecker {
         public String latestFileUrl;
         public String latestFileName;
         public String iconUrl; // best-effort project icon, from whichever source matched
+        // Always populated when the file was identified, even if it's already up to date —
+        // used by InstalledIndex to recognise content that was installed before that index
+        // existed, or installed by something other than this app.
+        public String projectId;
+        public String currentVersionId;
+        public String source; // "modrinth" or "curseforge"
     }
 
     public interface ResultCallback {
@@ -79,9 +85,12 @@ public class ContentUpdateChecker {
                 if (versions == null || versions.isEmpty()) { callback.onResult(null); return; }
                 ModVersion latest = versions.get(0);
                 Result result = new Result();
+                result.projectId = projectId;
+                result.currentVersionId = currentVersion.id;
+                result.source = "modrinth";
                 // Same file already installed — nothing to report, regardless of on-disk name.
                 if (currentVersion.id != null && currentVersion.id.equals(latest.id)) {
-                    callback.onResult(result); // hasUpdate stays false
+                    callback.onResult(result); // hasUpdate stays false, identity is still set
                     return;
                 }
                 ModVersion.VersionFile primary = ModDownloader.getPrimaryFile(latest);
@@ -114,6 +123,8 @@ public class ContentUpdateChecker {
             int modId = file.get("modId").getAsInt();
             curseforge.getMod(modId, mod -> {
                 Result result = new Result();
+                result.projectId = String.valueOf(modId);
+                result.source = "curseforge";
                 if (mod.has("logo") && !mod.get("logo").isJsonNull()) {
                     JsonObject logo = mod.getAsJsonObject("logo");
                     if (logo.has("thumbnailUrl") && !logo.get("thumbnailUrl").isJsonNull()) {
