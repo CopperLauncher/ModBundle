@@ -1,130 +1,143 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Two-row card: icon+name on top with room to breathe, actions on their own row below —
+     replaces the old single-row layout where the name could get cramped/cut off next to
+     four action buttons crammed onto the same line. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
+    android:orientation="vertical"
     android:background="@drawable/bg_mod_card"
     android:layout_marginHorizontal="12dp"
     android:layout_marginTop="10dp"
-    android:padding="16dp"
-    android:minHeight="80dp"
-    android:gravity="center_vertical">
+    android:padding="14dp">
 
-    <!-- Checkbox for bulk select -->
-    <CheckBox
-        android:id="@+id/mod_checkbox"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:buttonTint="?attr/colorPrimary"
-        android:layout_marginEnd="8dp"
-        android:visibility="gone"/>
-
-    <!-- Mod Icon -->
-    <ImageView
-        android:id="@+id/mod_icon"
-        android:layout_width="56dp"
-        android:layout_height="56dp"
-        android:scaleType="centerCrop"
-        android:background="@drawable/bg_icon_placeholder"
-        android:layout_marginEnd="14dp"/>
-
-    <!-- Info -->
+    <!-- Top row: icon + name/info -->
     <LinearLayout
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:orientation="vertical">
-        <TextView
-            android:id="@+id/mod_filename"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="16sp"
-            android:maxLines="1"
-            android:ellipsize="middle"/>
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginTop="6dp">
-            <TextView
-                android:id="@+id/mod_type_badge"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text=".jar"
-                android:textColor="@color/md_success"
-                android:textSize="12sp"
-                android:background="@drawable/bg_mod_card"
-                android:paddingHorizontal="8dp"
-                android:paddingVertical="2dp"
-                android:layout_marginEnd="10dp"/>
-            <TextView
-                android:id="@+id/mod_size"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="#888"
-                android:textSize="13sp"/>
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
 
+        <CheckBox
+            android:id="@+id/mod_checkbox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:buttonTint="?attr/colorPrimary"
+            android:layout_marginEnd="8dp"
+            android:visibility="gone"/>
+
+        <ImageView
+            android:id="@+id/mod_icon"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:scaleType="centerCrop"
+            android:background="@drawable/bg_icon_placeholder"
+            android:layout_marginEnd="14dp"/>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+            <!-- Real display name (from jar/zip metadata, falling back to the online
+                 project title, falling back to the raw filename) — see ContentNameResolver.
+                 Two lines now that it has its own row underneath it, so a longer real name
+                 doesn't get truncated the way a single line next to four buttons would. -->
+            <TextView
+                android:id="@+id/mod_filename"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="16sp"
+                android:maxLines="2"
+                android:ellipsize="end"/>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="6dp">
+                <TextView
+                    android:id="@+id/mod_type_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=".jar"
+                    android:textColor="@color/md_success"
+                    android:textSize="12sp"
+                    android:background="@drawable/bg_mod_card"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="2dp"
+                    android:layout_marginEnd="10dp"/>
+                <TextView
+                    android:id="@+id/mod_size"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="13sp"/>
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Switch version button -->
-    <ImageButton
-        android:id="@+id/btn_switch_version"
-        android:layout_width="44dp"
-        android:layout_height="44dp"
-        android:padding="10dp"
-        android:src="@drawable/ic_swap_horiz"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:tint="?attr/colorPrimary"
-        android:contentDescription="Switch version"
-        android:layout_marginEnd="4dp"/>
+    <!-- Bottom row: all actions, on their own line with room to not feel cramped. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="10dp">
 
-    <!-- Update button -->
-    <ImageButton
-        android:id="@+id/btn_update_mod"
-        android:layout_width="44dp"
-        android:layout_height="44dp"
-        android:padding="10dp"
-        android:src="@drawable/ic_update"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:tint="?attr/colorPrimary"
-        android:contentDescription="Update mod"
-        android:visibility="gone"
-        android:layout_marginEnd="4dp"/>
+        <!-- On/off toggle, replacing the old pause/play icon button — now shown for every
+             content type (mods, resource packs, shaders), not just mods. -->
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/switch_enabled_mod"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
 
-    <!-- Shown in place of btn_update_mod while an update download is in progress, so
-         updating a single mod doesn't need a blocking dialog — see setUpdating() in
-         InstalledModsAdapter. -->
-    <com.google.android.material.progressindicator.CircularProgressIndicator
-        android:id="@+id/progress_update_mod"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
-        android:layout_marginEnd="14dp"
-        android:indeterminate="true"
-        android:visibility="gone"/>
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1"/>
 
-    <!-- Disable button -->
-    <ImageButton
-        android:id="@+id/btn_disable_mod"
-        android:layout_width="44dp"
-        android:layout_height="44dp"
-        android:padding="10dp"
-        android:src="@drawable/ic_pause"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:tint="?attr/colorOnSurfaceVariant"
-        android:contentDescription="Disable mod"
-        android:layout_marginEnd="4dp"/>
+        <ImageButton
+            android:id="@+id/btn_switch_version"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:padding="8dp"
+            android:src="@drawable/ic_swap_horiz"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:tint="?attr/colorPrimary"
+            android:contentDescription="Switch version"/>
 
-    <!-- Delete button -->
-    <ImageButton
-        android:id="@+id/btn_delete_mod"
-        android:layout_width="44dp"
-        android:layout_height="44dp"
-        android:padding="10dp"
-        android:src="@drawable/ic_delete"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:tint="?attr/colorError"
-        android:contentDescription="Delete mod"/>
+        <ImageButton
+            android:id="@+id/btn_update_mod"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:padding="8dp"
+            android:src="@drawable/ic_update"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:tint="?attr/colorPrimary"
+            android:contentDescription="Update mod"
+            android:visibility="gone"/>
+
+        <!-- Shown in place of btn_update_mod while an update download is in progress, so
+             updating a single mod doesn't need a blocking dialog — see setUpdating() in
+             InstalledModsAdapter. -->
+        <com.google.android.material.progressindicator.CircularProgressIndicator
+            android:id="@+id/progress_update_mod"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginHorizontal="8dp"
+            android:indeterminate="true"
+            android:visibility="gone"/>
+
+        <ImageButton
+            android:id="@+id/btn_delete_mod"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:padding="8dp"
+            android:src="@drawable/ic_delete"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:tint="?attr/colorError"
+            android:contentDescription="Delete mod"/>
+    </LinearLayout>
 </LinearLayout>

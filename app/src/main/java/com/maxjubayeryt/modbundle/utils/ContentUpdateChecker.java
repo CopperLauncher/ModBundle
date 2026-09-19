@@ -57,27 +57,42 @@ public class ContentUpdateChecker {
     private final ModrinthApi modrinth = new ModrinthApi();
     private final CurseForgeApi curseforge = new CurseForgeApi();
 
-    /** Checks a SAF-backed installed file (post-Android 10 instance storage). */
+    /**
+     * Checks a SAF-backed installed file (post-Android 10 instance storage). The SHA1 used
+     * for the primary Modrinth lookup is computed by streaming the file rather than
+     * buffering it whole — shader packs in particular are routinely 50-100+MB, and reading
+     * one entirely into a byte[] just to hash it was needless memory pressure on every icon
+     * load. The full bytes are only read into memory as a fallback, and only when Modrinth
+     * doesn't recognise the file, since CurseForge's fingerprint match needs the actual
+     * byte content for its whitespace-stripped murmur2 hash.
+     */
     public void check(Context context, DocumentFile file, String gameVersion, String loader, ResultCallback callback) {
-        byte[] bytes = readAllBytes(context, file);
-        if (bytes == null) { callback.onResult(null); return; }
-        resolve(bytes, gameVersion, loader, callback);
-    }
-
-    /** Checks a plain java.io.File-backed installed file (legacy storage). */
-    public void check(File file, String gameVersion, String loader, ResultCallback callback) {
-        byte[] bytes = readAllBytes(file);
-        if (bytes == null) { callback.onResult(null); return; }
-        resolve(bytes, gameVersion, loader, callback);
-    }
-
-    private void resolve(byte[] bytes, String gameVersion, String loader, ResultCallback callback) {
-        String sha1 = sha1Hex(bytes);
+        String sha1;
+        try (InputStream is = context.getContentResolver().openInputStream(file.getUri())) {
+            if (is == null) { callback.onResult(null); return; }
+            sha1 = sha1Hex(is);
+        } catch (Exception e) { callback.onResult(null); return; }
         if (sha1 == null) { callback.onResult(null); return; }
+        resolve(sha1, () -> readAllBytes(context, file), gameVersion, loader, callback);
+    }
 
+    /** Checks a plain java.io.File-backed installed file (legacy storage). Same streaming approach as above. */
+    public void check(File file, String gameVersion, String loader, ResultCallback callback) {
+        String sha1;
+        try (InputStream is = new FileInputStream(file)) {
+            sha1 = sha1Hex(is);
+        } catch (Exception e) { callback.onResult(null); return; }
+        if (sha1 == null) { callback.onResult(null); return; }
+        resolve(sha1, () -> readAllBytes(file), gameVersion, loader, callback);
+    }
+
+    private void resolve(String sha1, java.util.function.Supplier<byte[]> fullBytes,
+                         String gameVersion, String loader, ResultCallback callback) {
         modrinth.getVersionFromHash(sha1, currentVersion -> {
             String projectId = currentVersion != null ? extractProjectId(currentVersion) : null;
             if (projectId == null) {
+                byte[] bytes = fullBytes.get();
+                if (bytes == null) { callback.onResult(null); return; }
                 fallbackToCurseForge(bytes, callback);
                 return;
             }
@@ -106,7 +121,11 @@ public class ContentUpdateChecker {
                 }
                 fetchModrinthIcon(projectId, result, callback);
             }, e -> callback.onResult(null));
-        }, e -> fallbackToCurseForge(bytes, callback));
+        }, e -> {
+            byte[] bytes = fullBytes.get();
+            if (bytes == null) { callback.onResult(null); return; }
+            fallbackToCurseForge(bytes, callback);
+        });
     }
 
     private void fetchModrinthIcon(String projectId, Result result, ResultCallback callback) {
@@ -173,10 +192,13 @@ public class ContentUpdateChecker {
         return bos.toByteArray();
     }
 
-    private static String sha1Hex(byte[] bytes) {
+    private static String sha1Hex(InputStream is) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-1");
-            byte[] digest = md.digest(bytes);
+            byte[] buf = new byte[8192];
+            int read;
+            while ((read = is.read(buf)) != -1) md.update(buf, 0, read);
+            byte[] digest = md.digest();
             StringBuilder sb = new StringBuilder();
             for (byte b : digest) sb.append(String.format("%02x", b));
             return sb.toString();

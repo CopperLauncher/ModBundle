@@ -481,6 +481,7 @@ public class MainActivity extends AppCompatActivity {
      */
     /** Points the browse adapter at the install index for whichever instance is active. */
     private void refreshInstallIndexBinding() {
+        if (installedAdapter != null) installedAdapter.setInstalledIndex(installedIndex, getActiveInstancePath());
         if (modAdapter == null) return;
         modAdapter.setInstalledIndex(installedIndex, getActiveInstancePath());
         modAdapter.setInstallStateResolver((mod, callback) -> {
@@ -747,7 +748,9 @@ public class MainActivity extends AppCompatActivity {
                     .setNegativeButton("Cancel", null).show();
             },
             mod -> {
-                if (!"mods".equals(currentInstalledType)) return;
+                // Was gated to mods only — the switch is now shown for every content type,
+                // so the actual toggle action has to work for all of them too, or tapping
+                // it on a resource pack/shader would silently do nothing.
                 if (mod instanceof androidx.documentfile.provider.DocumentFile) {
                     androidx.documentfile.provider.DocumentFile df = (androidx.documentfile.provider.DocumentFile) mod;
                     String name = df.getName(); if (name == null) return;
@@ -763,6 +766,7 @@ public class MainActivity extends AppCompatActivity {
             (mod, meta) -> performUpdate(mod, meta)
         );
         installedAdapter.setOnSwitchVersionListener(this::showSwitchVersionDialog);
+        installedAdapter.setInstalledIndex(installedIndex, getActiveInstancePath());
 
         btnCheckUpdates.setOnClickListener(v -> checkUpdates());
         btnUpdateAll.setOnClickListener(v -> {
@@ -787,7 +791,7 @@ public class MainActivity extends AppCompatActivity {
         installedTabShaders.setTypeface(null, "shaderpacks".equals(currentInstalledType) ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
         installedTabResourcepacks.setTextColor("resourcepacks".equals(currentInstalledType) ? com.maxjubayeryt.modbundle.utils.ThemeColors.primary(installedTabResourcepacks) : com.maxjubayeryt.modbundle.utils.ThemeColors.onSurfaceVariant(installedTabResourcepacks));
         installedTabResourcepacks.setTypeface(null, "resourcepacks".equals(currentInstalledType) ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
-        installedAdapter.setShowDisable("mods".equals(currentInstalledType));
+        installedAdapter.setShowDisable(true); // now applies to all content types, not just mods
         installedAdapter.setCurrentType(currentInstalledType);
         installedAdapter.notifyDataSetChanged();
     }

@@ -33,6 +33,10 @@ public class InstalledModsAdapter extends RecyclerView.Adapter<InstalledModsAdap
     private boolean showDisable = true;
     private boolean showCheckboxes = false;
     private String currentType = "mods";
+    // Used by ContentNameResolver to look up an already-known project id for a filename
+    // without re-hashing the file — see setInstalledIndex().
+    private String instanceKey;
+    private com.maxjubayeryt.modbundle.utils.InstalledIndex installedIndex;
 
     // Cache metadata per filename
     private final Map<String, ModMetadata> metaCache = new HashMap<>();
@@ -51,6 +55,12 @@ public class InstalledModsAdapter extends RecyclerView.Adapter<InstalledModsAdap
     }
 
     public void setOnSwitchVersionListener(OnSwitchVersionListener listener) { this.switchVersionListener = listener; }
+
+    /** Supplies what ContentNameResolver needs to look up an already-known project title. */
+    public void setInstalledIndex(com.maxjubayeryt.modbundle.utils.InstalledIndex index, String instanceKey) {
+        this.installedIndex = index;
+        this.instanceKey = instanceKey;
+    }
 
     /** Toggles the inline per-row update spinner for a filename, in place of the update button. */
     public void setUpdating(String filename, boolean updating) {
@@ -128,7 +138,13 @@ public class InstalledModsAdapter extends RecyclerView.Adapter<InstalledModsAdap
             });
         }
 
-        holder.name.setText(name);
+        holder.name.setText(name); // immediate placeholder — replaced below once resolved
+        holder.name.setTag(name);
+        final String nameTagAtBind = name;
+        final android.widget.TextView nameView = holder.name;
+        com.maxjubayeryt.modbundle.utils.ContentNameResolver.resolve(
+                nameView.getContext(), mod, name, instanceKey, installedIndex,
+                resolvedName -> { if (nameTagAtBind.equals(nameView.getTag())) nameView.setText(resolvedName); });
         holder.size.setText(formatSize(size));
 
         boolean isDisabled = name.endsWith(".disabled");
@@ -153,11 +169,14 @@ public class InstalledModsAdapter extends RecyclerView.Adapter<InstalledModsAdap
             holder.btnUpdate.setVisibility(View.GONE);
         }
 
-        // Disable button
-        holder.btnDisable.setVisibility(showDisable ? View.VISIBLE : View.GONE);
-        holder.btnDisable.setImageResource(isDisabled ? R.drawable.ic_play : R.drawable.ic_pause);
-        holder.btnDisable.setColorFilter(isDisabled ? com.maxjubayeryt.modbundle.utils.ThemeColors.primary(holder.btnDisable) : com.maxjubayeryt.modbundle.utils.ThemeColors.onSurfaceVariant(holder.btnDisable));
-        holder.btnDisable.setOnClickListener(v -> { if (disableListener != null) disableListener.onDisable(modRef); });
+        // On/off toggle — replaces the old pause/play icon button, and now shown for
+        // every content type (mods, resource packs, shaders), not just mods.
+        holder.switchEnabled.setVisibility(showDisable ? View.VISIBLE : View.GONE);
+        holder.switchEnabled.setOnCheckedChangeListener(null); // avoid firing while we set the state below
+        holder.switchEnabled.setChecked(!isDisabled);
+        holder.switchEnabled.setOnCheckedChangeListener((btn, checkedOn) -> {
+            if (disableListener != null) disableListener.onDisable(modRef);
+        });
 
         holder.btnDelete.setOnClickListener(v -> deleteListener.onDelete(modRef));
 
@@ -184,7 +203,8 @@ public class InstalledModsAdapter extends RecyclerView.Adapter<InstalledModsAdap
         CheckBox checkbox;
         android.widget.ImageView icon;
         TextView name, size, typeBadge;
-        ImageButton btnDelete, btnDisable, btnUpdate, btnSwitchVersion;
+        ImageButton btnDelete, btnUpdate, btnSwitchVersion;
+        com.google.android.material.materialswitch.MaterialSwitch switchEnabled;
         com.google.android.material.progressindicator.CircularProgressIndicator progressUpdate;
         ViewHolder(View v) {
             super(v);
@@ -194,10 +214,10 @@ public class InstalledModsAdapter extends RecyclerView.Adapter<InstalledModsAdap
             size = v.findViewById(R.id.mod_size);
             typeBadge = v.findViewById(R.id.mod_type_badge);
             btnDelete = v.findViewById(R.id.btn_delete_mod);
-            btnDisable = v.findViewById(R.id.btn_disable_mod);
             btnUpdate = v.findViewById(R.id.btn_update_mod);
             btnSwitchVersion = v.findViewById(R.id.btn_switch_version);
             progressUpdate = v.findViewById(R.id.progress_update_mod);
+            switchEnabled = v.findViewById(R.id.switch_enabled_mod);
         }
     }
 }
