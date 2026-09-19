@@ -66,7 +66,11 @@ public class ContentNameResolver {
 
     private static void deliver(String fileName, String name, NameCallback callback) {
         sCache.put(fileName, name);
-        callback.onName(name);
+        // Same pattern as ModIconLoader: this runs on the background executor thread, and
+        // the callback touches a view (setText), so it has to be posted back to the main
+        // thread — calling it directly here was the exact cause of the
+        // CalledFromWrongThreadException crash.
+        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> callback.onName(name));
     }
 
     private static String stripDisabled(String fileName) {

@@ -754,13 +754,27 @@ public class MainActivity extends AppCompatActivity {
                 if (mod instanceof androidx.documentfile.provider.DocumentFile) {
                     androidx.documentfile.provider.DocumentFile df = (androidx.documentfile.provider.DocumentFile) mod;
                     String name = df.getName(); if (name == null) return;
-                    df.renameTo(name.endsWith(".disabled") ? name.replace(".disabled", "") : name + ".disabled");
-                    refreshInstalled();
+                    // DocumentFile.renameTo() updates this same object's underlying Uri in
+                    // place on success, so no list-entry swap is needed the way File needs
+                    // below — the row just needs telling to rebind.
+                    if (df.renameTo(name.endsWith(".disabled") ? name.replace(".disabled", "") : name + ".disabled")) {
+                        com.maxjubayeryt.modbundle.utils.ContentNameResolver.invalidate(name);
+                        refreshSingleInstalledItem(mod, mod);
+                    }
                 } else if (mod instanceof java.io.File) {
                     java.io.File f = (java.io.File) mod;
                     String name = f.getName();
-                    f.renameTo(new java.io.File(f.getParent(), name.endsWith(".disabled") ? name.replace(".disabled", "") : name + ".disabled"));
-                    refreshInstalled();
+                    // Unlike DocumentFile, java.io.File is an immutable path wrapper —
+                    // renameTo() performs the OS rename but leaves this object reporting the
+                    // OLD name. The list has to hold the new File reference or a targeted
+                    // notifyItemChanged() would rebind the row with stale data instead of
+                    // fixing the "whole list flashes" problem.
+                    java.io.File renamed = new java.io.File(f.getParent(),
+                            name.endsWith(".disabled") ? name.replace(".disabled", "") : name + ".disabled");
+                    if (f.renameTo(renamed)) {
+                        com.maxjubayeryt.modbundle.utils.ContentNameResolver.invalidate(name);
+                        refreshSingleInstalledItem(mod, renamed);
+                    }
                 }
             },
             (mod, meta) -> performUpdate(mod, meta)
@@ -1372,6 +1386,22 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /** Builds a File/DocumentFile reference for a specific file in a subfolder of the active instance. */
+    private Object resolveInstalledFile(String subFolder, String fileName) {
+        Uri instanceUri = prefs.getInstanceUri();
+        if (instanceUri != null && "content".equals(instanceUri.getScheme())) {
+            androidx.documentfile.provider.DocumentFile dir =
+                    androidx.documentfile.provider.DocumentFile.fromTreeUri(this, instanceUri);
+            if (dir == null) return null;
+            androidx.documentfile.provider.DocumentFile sub = dir.findFile(subFolder);
+            return sub != null ? sub.findFile(fileName) : null;
+        }
+        java.io.File instanceDir = getLegacyInstanceDir();
+        if (instanceDir == null) return null;
+        java.io.File f = new java.io.File(new java.io.File(instanceDir, subFolder), fileName);
+        return f.exists() ? f : null;
+    }
+
     private void performUpdate(Object mod, com.maxjubayeryt.modbundle.utils.ModMetadata meta) {
         if (meta.latestFileUrl == null) return;
         String oldFileName = (mod instanceof androidx.documentfile.provider.DocumentFile)
@@ -1380,6 +1410,7 @@ public class MainActivity extends AppCompatActivity {
         file.url = meta.latestFileUrl; file.filename = meta.latestFileName; file.primary = true;
         if (mod instanceof androidx.documentfile.provider.DocumentFile) ((androidx.documentfile.provider.DocumentFile) mod).delete();
         else if (mod instanceof java.io.File) ((java.io.File) mod).delete();
+        final int rowIndex = installedMods.indexOf(mod); // captured before delete, position doesn't move
 
         // Inline per-row spinner instead of a dialog that blocks the whole screen for one
         // mod's update — see setUpdating() in InstalledModsAdapter.
@@ -1392,7 +1423,17 @@ public class MainActivity extends AppCompatActivity {
                     if (oldFileName != null) installedAdapter.setUpdating(oldFileName, false);
                     // Remove this mod's update entry from cache
                     installedAdapter.getMetaCache().remove(meta.latestFileName);
-                    refreshInstalled();
+                    if (oldFileName != null) com.maxjubayeryt.modbundle.utils.ContentNameResolver.invalidate(oldFileName);
+                    // Swaps in the new file reference at the same row instead of a full
+                    // refreshInstalled() re-scan + notifyDataSetChanged() of everything —
+                    // that full re-fetch was what made the whole Installed tab visibly
+                    // flash/reload after updating just one piece of content.
+                    Object newFile = resolveInstalledFile(destType, fileName);
+                    if (rowIndex >= 0 && newFile != null) {
+                        refreshSingleInstalledItem(mod, newFile);
+                    } else {
+                        refreshInstalled(); // couldn't resolve the new file — fall back safely
+                    }
                     Toast.makeText(MainActivity.this, "Updated!", Toast.LENGTH_SHORT).show();
                 });
             }
@@ -1424,6 +1465,21 @@ public class MainActivity extends AppCompatActivity {
             java.io.File instanceDir = getLegacyInstanceDir();
             if (instanceDir != null) downloader.downloadMod(file, new java.io.File(instanceDir, destType), null, finalUpVersion, finalUpLoader, callback);
         }
+    }
+
+    /**
+     * Updates one row in place instead of re-scanning the instance folder and calling
+     * notifyDataSetChanged() on the whole list — which is what was making the entire
+     * Installed tab visibly flash/reload after toggling or updating a single piece of
+     * content. Matches Copper's own pattern (notifyItemChanged per action, not a blanket
+     * refresh) rather than ModBundle's previous full-refresh-after-everything approach.
+     */
+    private void refreshSingleInstalledItem(Object oldRef, Object newRef) {
+        int index = installedMods.indexOf(oldRef);
+        if (index < 0) { refreshInstalled(); return; } // shouldn't happen; fall back safely
+        if (oldRef != newRef) installedMods.set(index, newRef);
+        installedAdapter.notifyItemChanged(index);
+        if (tvInstalledCount != null) tvInstalledCount.setText(installedMods.size() + " files");
     }
 
     private void refreshInstalled() {
