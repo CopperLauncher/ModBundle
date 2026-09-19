@@ -1411,6 +1411,13 @@ public class MainActivity extends AppCompatActivity {
         if (mod instanceof androidx.documentfile.provider.DocumentFile) ((androidx.documentfile.provider.DocumentFile) mod).delete();
         else if (mod instanceof java.io.File) ((java.io.File) mod).delete();
         final int rowIndex = installedMods.indexOf(mod); // captured before delete, position doesn't move
+        // Was hardcoded to "mods" here regardless of which tab the update came from — an
+        // update for a resource pack or shader pack was silently re-downloaded into the
+        // mods folder instead of its own. currentInstalledType is the actual destination.
+        // Declared here (before the callback below, which references it) rather than after
+        // it — this used to be declared later in the method, which doesn't compile since
+        // the callback captures it before it's in scope.
+        final String destType = currentInstalledType;
 
         // Inline per-row spinner instead of a dialog that blocks the whole screen for one
         // mod's update — see setUpdating() in InstalledModsAdapter.
@@ -1454,10 +1461,6 @@ public class MainActivity extends AppCompatActivity {
         }
         final String finalUpLoader = upLoader.isEmpty() ? getSelectedLoader() : upLoader;
         final String finalUpVersion = upVersion.isEmpty() ? getSelectedVersion() : upVersion;
-        // Was hardcoded to "mods" here regardless of which tab the update came from — an
-        // update for a resource pack or shader pack was silently re-downloaded into the
-        // mods folder instead of its own. currentInstalledType is the actual destination.
-        final String destType = currentInstalledType;
 
         if (instanceUri != null && "content".equals(instanceUri.getScheme())) {
             downloader.downloadMod(file, instanceUri, destType, null, finalUpVersion, finalUpLoader, callback);
