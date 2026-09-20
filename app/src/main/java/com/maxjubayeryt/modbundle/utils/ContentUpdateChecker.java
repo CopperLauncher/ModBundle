@@ -15,6 +15,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.security.MessageDigest;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Content-type-agnostic update and icon resolution, ported from
@@ -57,6 +59,17 @@ public class ContentUpdateChecker {
     private final ModrinthApi modrinth = new ModrinthApi();
     private final CurseForgeApi curseforge = new CurseForgeApi();
 
+    // Multiple independent callers — the icon loader, the display-name resolver, and the
+    // install-index backfill — all need the same per-file identity, and were each triggering
+    // their own hash + network resolution for the same file at nearly the same time right
+    // after the Installed tab loaded. That redundant work (up to 2-3x the network calls and
+    // executor contention it needed) was the actual cause of the multi-second load with many
+    // mods installed. Caching the resolved Result per file, and coalescing concurrent
+    // requests for a file that's already being resolved, means each file is only ever
+    // hashed and looked up once per session, however many things ask for it.
+    private static final Map<String, Result> sResultCache = new ConcurrentHashMap<>();
+    private static final Map<String, java.util.List<ResultCallback>> sInFlight = new ConcurrentHashMap<>();
+
     /**
      * Checks a SAF-backed installed file (post-Android 10 instance storage). The SHA1 used
      * for the primary Modrinth lookup is computed by streaming the file rather than
@@ -67,23 +80,54 @@ public class ContentUpdateChecker {
      * byte content for its whitespace-stripped murmur2 hash.
      */
     public void check(Context context, DocumentFile file, String gameVersion, String loader, ResultCallback callback) {
+        String tag = file.getUri().toString();
+        if (deliverCachedOrQueue(tag, callback)) return;
         String sha1;
         try (InputStream is = context.getContentResolver().openInputStream(file.getUri())) {
-            if (is == null) { callback.onResult(null); return; }
+            if (is == null) { finishAndFlush(tag, null); return; }
             sha1 = sha1Hex(is);
-        } catch (Exception e) { callback.onResult(null); return; }
-        if (sha1 == null) { callback.onResult(null); return; }
-        resolve(sha1, () -> readAllBytes(context, file), gameVersion, loader, callback);
+        } catch (Exception e) { finishAndFlush(tag, null); return; }
+        if (sha1 == null) { finishAndFlush(tag, null); return; }
+        resolve(sha1, () -> readAllBytes(context, file), gameVersion, loader, result -> finishAndFlush(tag, result));
     }
 
     /** Checks a plain java.io.File-backed installed file (legacy storage). Same streaming approach as above. */
     public void check(File file, String gameVersion, String loader, ResultCallback callback) {
+        String tag = file.getAbsolutePath();
+        if (deliverCachedOrQueue(tag, callback)) return;
         String sha1;
         try (InputStream is = new FileInputStream(file)) {
             sha1 = sha1Hex(is);
-        } catch (Exception e) { callback.onResult(null); return; }
-        if (sha1 == null) { callback.onResult(null); return; }
-        resolve(sha1, () -> readAllBytes(file), gameVersion, loader, callback);
+        } catch (Exception e) { finishAndFlush(tag, null); return; }
+        if (sha1 == null) { finishAndFlush(tag, null); return; }
+        resolve(sha1, () -> readAllBytes(file), gameVersion, loader, result -> finishAndFlush(tag, result));
+    }
+
+    /**
+     * Returns true (and either delivers a cached result or queues the callback for delivery
+     * once the in-flight resolution finishes) if nothing further needs to be started for this
+     * tag. Returns false if the caller needs to actually kick off resolution — and has, by
+     * that point, registered as the one doing so, so a second concurrent caller for the same
+     * tag always sees itself as queued rather than also starting a resolution.
+     */
+    private boolean deliverCachedOrQueue(String tag, ResultCallback callback) {
+        Result cached = sResultCache.get(tag);
+        if (cached != null) { callback.onResult(cached); return true; }
+        synchronized (sInFlight) {
+            java.util.List<ResultCallback> waiters = sInFlight.get(tag);
+            if (waiters != null) { waiters.add(callback); return true; }
+            java.util.List<ResultCallback> mine = new java.util.ArrayList<>();
+            mine.add(callback);
+            sInFlight.put(tag, mine);
+            return false;
+        }
+    }
+
+    private void finishAndFlush(String tag, Result result) {
+        if (result != null) sResultCache.put(tag, result); // null results aren't cached — worth retrying later (e.g. transient network failure)
+        java.util.List<ResultCallback> waiters;
+        synchronized (sInFlight) { waiters = sInFlight.remove(tag); }
+        if (waiters != null) for (ResultCallback cb : waiters) cb.onResult(result);
     }
 
     private void resolve(String sha1, java.util.function.Supplier<byte[]> fullBytes,
