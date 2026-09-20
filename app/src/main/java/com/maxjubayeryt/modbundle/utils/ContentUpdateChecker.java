@@ -96,31 +96,37 @@ public class ContentUpdateChecker {
                 fallbackToCurseForge(bytes, callback);
                 return;
             }
-            modrinth.getVersions(projectId, nullToEmpty(gameVersion), nullToEmpty(loader), versions -> {
-                if (versions == null || versions.isEmpty()) { callback.onResult(null); return; }
-                ModVersion latest = versions.get(0);
-                Result result = new Result();
-                result.projectId = projectId;
-                result.currentVersionId = currentVersion.id;
-                result.source = "modrinth";
-                // Same file already installed — still fetch the icon below, just skip the
-                // update fields. This was previously an early return with no icon fetch at
-                // all, which meant any already-up-to-date content (the common case — most
-                // installed files aren't mid-update most of the time) never got an icon.
-                // Shaders hit this on nearly every load since they have no local icon to
-                // fall back to first, unlike mods/resourcepacks.
-                boolean upToDate = currentVersion.id != null && currentVersion.id.equals(latest.id);
-                if (!upToDate) {
-                    ModVersion.VersionFile primary = ModDownloader.getPrimaryFile(latest);
-                    if (primary != null) {
-                        result.hasUpdate = true;
-                        result.latestVersionName = latest.versionNumber;
-                        result.latestFileUrl = primary.url;
-                        result.latestFileName = primary.filename;
+            Result result = new Result();
+            result.projectId = projectId;
+            result.currentVersionId = currentVersion.id;
+            result.source = "modrinth";
+
+            // Icon is fetched directly from the project, independent of the update check
+            // below — this is exactly Copper's own resolveRemoteIconUrl approach (hash ->
+            // version_file -> project -> icon_url, two calls total). Gating the icon fetch
+            // on getVersions() succeeding, like a previous version of this method did, meant
+            // an icon could fail to load for reasons that have nothing to do with whether an
+            // icon actually exists — an empty/failed versions list took the icon down with
+            // it even though the projectId was already known. Shaders hit this constantly
+            // since they have no local icon to fall back on first.
+            fetchModrinthIcon(projectId, result, () -> {
+                modrinth.getVersions(projectId, nullToEmpty(gameVersion), nullToEmpty(loader), versions -> {
+                    if (versions != null && !versions.isEmpty()) {
+                        ModVersion latest = versions.get(0);
+                        boolean upToDate = currentVersion.id != null && currentVersion.id.equals(latest.id);
+                        if (!upToDate) {
+                            ModVersion.VersionFile primary = ModDownloader.getPrimaryFile(latest);
+                            if (primary != null) {
+                                result.hasUpdate = true;
+                                result.latestVersionName = latest.versionNumber;
+                                result.latestFileUrl = primary.url;
+                                result.latestFileName = primary.filename;
+                            }
+                        }
                     }
-                }
-                fetchModrinthIcon(projectId, result, callback);
-            }, e -> callback.onResult(null));
+                    callback.onResult(result);
+                }, e -> callback.onResult(result)); // version lookup failed — icon (if any) is still valid, deliver what we have
+            });
         }, e -> {
             byte[] bytes = fullBytes.get();
             if (bytes == null) { callback.onResult(null); return; }
@@ -128,13 +134,13 @@ public class ContentUpdateChecker {
         });
     }
 
-    private void fetchModrinthIcon(String projectId, Result result, ResultCallback callback) {
+    private void fetchModrinthIcon(String projectId, Result result, Runnable onDone) {
         modrinth.getProject(projectId, new ModrinthApi.Callback<com.maxjubayeryt.modbundle.model.ModResult>() {
             @Override public void onSuccess(com.maxjubayeryt.modbundle.model.ModResult project) {
                 if (project != null) result.iconUrl = project.iconUrl;
-                callback.onResult(result);
+                onDone.run();
             }
-            @Override public void onError(String error) { callback.onResult(result); }
+            @Override public void onError(String error) { onDone.run(); }
         });
     }
 
