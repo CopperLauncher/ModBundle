@@ -74,7 +74,9 @@ public class RemoteIconCache {
             return;
         }
         pool.execute(() -> {
-            File cacheFile = new File(cacheDir, sanitize(tag) + ".ico");
+            // Key on the URL as well as the tag: the tag is the installed file's path, so a file
+            // replaced/updated under the same name would otherwise keep showing the old icon.
+            File cacheFile = new File(cacheDir, sanitize(tag) + "_" + Integer.toHexString(url.hashCode()) + ".ico");
             if (cacheFile.isFile() && cacheFile.canRead()) {
                 Bitmap bmp = BitmapFactory.decodeFile(cacheFile.getAbsolutePath());
                 if (bmp != null) {
@@ -92,7 +94,7 @@ public class RemoteIconCache {
         int retries = 0;
         while (retries < 3) {
             try {
-                Request request = new Request.Builder().url(url).build();
+                Request request = new Request.Builder().url(url).header("User-Agent", "ModBundle/1.0 (github.com/copperlauncher)").build();
                 try (Response response = client.newCall(request).execute()) {
                     if (!response.isSuccessful() || response.body() == null) {
                         retries++;
@@ -106,12 +108,13 @@ public class RemoteIconCache {
                     }
                 }
                 Bitmap bitmap = BitmapFactory.decodeFile(cacheFile.getAbsolutePath());
-                if (bitmap == null) return null;
+                if (bitmap == null) { cacheFile.delete(); return null; } // don't leave an undecodable file behind
                 return downscaleAndPersist(bitmap, cacheFile);
             } catch (IOException e) {
                 retries++;
             }
         }
+        cacheFile.delete(); // a partial download must not be mistaken for a cached icon next time
         return null;
     }
 

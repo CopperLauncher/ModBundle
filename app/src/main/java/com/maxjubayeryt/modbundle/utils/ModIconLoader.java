@@ -19,8 +19,10 @@ public class ModIconLoader {
     // Modrinth/CurseForge at most once per session and remembered here, so a
     // RecyclerView scrolling back and forth doesn't refire the same lookups —
     // mirrors Copper's InstalledModAdapter#mIconCheckedNoResult behaviour.
-    private static final java.util.Set<String> sNoRemoteIcon =
-            java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+    // Entries expire: a rate limit or a brief network drop used to blacklist a file for the
+    // whole session, which for shader packs (no local icon) meant a permanent placeholder.
+    private static final long NO_ICON_RETRY_MS = 60_000L;
+    private static final java.util.Map<String, Long> sNoRemoteIcon = new java.util.concurrent.ConcurrentHashMap<>();
     private static final ContentUpdateChecker sUpdateChecker = new ContentUpdateChecker();
     // A RecyclerView rebind (scrolling, or any notifyDataSetChanged()) re-binds every
     // visible row at once; spawning a raw `new Thread()` per icon load meant a burst of
@@ -39,9 +41,9 @@ public class ModIconLoader {
                     postBitmap(target, bmp);
                 } else {
                     tryRemoteIcon(ctx, file.getAbsolutePath(), target, type,
-                            cb -> sUpdateChecker.check(file, "", "", cb));
+                            cb -> sUpdateChecker.checkIcon(file, cb));
                 }
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 setDefault(ctx, target, type);
             }
         });
@@ -59,35 +61,37 @@ public class ModIconLoader {
                     postBitmap(target, bmp);
                 } else {
                     tryRemoteIcon(ctx, file.getUri().toString(), target, type,
-                            cb -> sUpdateChecker.check(ctx, file, "", "", cb));
+                            cb -> sUpdateChecker.checkIcon(ctx, file, cb));
                 }
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 setDefault(ctx, target, type);
             }
         });
     }
 
-    private interface CheckInvoker { void invoke(ContentUpdateChecker.ResultCallback cb); }
+    private interface CheckInvoker { void invoke(ContentUpdateChecker.IconUrlCallback cb); }
 
     /**
-     * Remote icon fallback shared by both load() overloads: hashes the file (inside
-     * ContentUpdateChecker) to identify it on Modrinth, falling back to CurseForge
-     * fingerprint matching, then downloads+disk-caches the resolved icon_url/logo via
-     * RemoteIconCache. This is what actually makes shader packs and resource packs
-     * (which never carry an embedded icon the way mod jars do) show real icons instead
-     * of the generic placeholder — ported from Copper-Android's icon resolution chain.
+     * Remote icon fallback shared by both load() overloads: hashes the file to identify it on
+     * Modrinth (CurseForge fingerprint as a fallback), then downloads+disk-caches the project's
+     * icon via RemoteIconCache. Shader packs never carry an embedded icon the way mod jars and
+     * resource packs (pack.png) do, so this is the only way they get a real icon. The lookup is
+     * icon-only (see ContentUpdateChecker#checkIcon) so it isn't held up or broken by the
+     * separate update-version lookup.
      */
     private static void tryRemoteIcon(Context ctx, String tag, ImageView target, FileType type, CheckInvoker invoker) {
-        if (sNoRemoteIcon.contains(tag)) { setDefault(ctx, target, type); return; }
-        invoker.invoke(result -> {
-            if (result == null || result.iconUrl == null || result.iconUrl.isEmpty()) {
-                sNoRemoteIcon.add(tag);
+        Long failedAt = sNoRemoteIcon.get(tag);
+        if (failedAt != null && System.currentTimeMillis() - failedAt < NO_ICON_RETRY_MS) { setDefault(ctx, target, type); return; }
+        invoker.invoke(iconUrl -> {
+            if (iconUrl == null || iconUrl.isEmpty()) {
+                sNoRemoteIcon.put(tag, System.currentTimeMillis());
                 setDefault(ctx, target, type);
                 return;
             }
-            RemoteIconCache.get(ctx).getIcon(tag, result.iconUrl, bitmap -> {
+            sNoRemoteIcon.remove(tag);
+            RemoteIconCache.get(ctx).getIcon(tag, iconUrl, bitmap -> {
                 if (bitmap != null) target.setImageBitmap(bitmap);
-                else { sNoRemoteIcon.add(tag); setDefault(ctx, target, type); }
+                else { sNoRemoteIcon.put(tag, System.currentTimeMillis()); setDefault(ctx, target, type); }
             });
         });
     }

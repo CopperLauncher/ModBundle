@@ -21,6 +21,56 @@ public class ModrinthApi {
     private final OkHttpClient client = new OkHttpClient();
     private final Gson gson = new Gson();
 
+    // Installed-tab icon/name lookups fire one hash lookup + one project lookup per file.
+    // Unbounded, that trips Modrinth's rate limit (HTTP 429) on any decent-sized folder;
+    // the failed lookup used to be treated as "no icon exists", which permanently blanked
+    // shader icons (they have no local icon to fall back on). Lookups now go through a
+    // small shared gate and retry on 429/5xx instead of giving up on the first failure.
+    private static final java.util.concurrent.Semaphore LOOKUP_GATE = new java.util.concurrent.Semaphore(4);
+    private static final int LOOKUP_MAX_ATTEMPTS = 3;
+
+    /** HTTP failure carrying the status code so callers can tell "not found" from "try again later". */
+    public static class HttpStatusException extends IOException {
+        public final int code;
+        public HttpStatusException(int code) { super("HTTP " + code); this.code = code; }
+    }
+
+    private String fetchWithRetry(String url) throws IOException {
+        IOException last = null;
+        for (int attempt = 1; attempt <= LOOKUP_MAX_ATTEMPTS; attempt++) {
+            long waitMs = 0;
+            try {
+                LOOKUP_GATE.acquire();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Interrupted");
+            }
+            try {
+                Request request = new Request.Builder().url(url).header("User-Agent", USER_AGENT).build();
+                try (Response response = client.newCall(request).execute()) {
+                    int code = response.code();
+                    if (response.isSuccessful() && response.body() != null) return response.body().string();
+                    if (code == 404) throw new HttpStatusException(404); // definitive, don't retry
+                    last = new HttpStatusException(code);
+                    if (code != 429 && code < 500) throw last; // other 4xx won't fix themselves
+                    String retryAfter = response.header("Retry-After");
+                    try { waitMs = retryAfter != null ? Long.parseLong(retryAfter.trim()) * 1000L : 0; } catch (NumberFormatException ignored) { }
+                }
+            } catch (HttpStatusException e) {
+                throw e;
+            } catch (IOException e) {
+                last = e;
+            } finally {
+                LOOKUP_GATE.release();
+            }
+            if (attempt < LOOKUP_MAX_ATTEMPTS) {
+                if (waitMs <= 0) waitMs = 800L * attempt;
+                try { Thread.sleep(Math.min(waitMs, 5000L)); } catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IOException("Interrupted"); }
+            }
+        }
+        throw last != null ? last : new IOException("Request failed");
+    }
+
     public interface Callback<T> {
         void onSuccess(T result);
         void onError(String error);
@@ -99,18 +149,17 @@ public class ModrinthApi {
 
     public void getProject(String projectId, Callback<ModResult> callback) {
         new Thread(() -> {
+            ModResult project;
             try {
-                Request request = new Request.Builder()
-                        .url(BASE + "/project/" + projectId)
-                        .header("User-Agent", USER_AGENT)
-                        .build();
-                try (Response response = client.newCall(request).execute()) {
-                    if (!response.isSuccessful()) { callback.onError("Server error: " + response.code()); return; }
-                    callback.onSuccess(gson.fromJson(response.body().string(), ModResult.class));
-                }
+                project = gson.fromJson(fetchWithRetry(BASE + "/project/" + projectId), ModResult.class);
+            } catch (HttpStatusException e) {
+                callback.onError("Server error: " + e.code); return;
             } catch (IOException e) {
-                callback.onError("Network error: " + e.getMessage());
+                callback.onError("Network error: " + e.getMessage()); return;
+            } catch (RuntimeException e) {
+                callback.onError("Bad response: " + e.getMessage()); return;
             }
+            callback.onSuccess(project);
         }).start();
     }
 
@@ -142,18 +191,17 @@ public class ModrinthApi {
      */
     public void getVersionFromHash(String sha1, OnSuccess<ModVersion> onSuccess, OnError onError) {
         new Thread(() -> {
+            ModVersion version;
             try {
-                Request request = new Request.Builder()
-                        .url(BASE + "/version_file/" + sha1 + "?algorithm=sha1")
-                        .header("User-Agent", USER_AGENT)
-                        .build();
-                try (Response response = client.newCall(request).execute()) {
-                    if (!response.isSuccessful()) { onError.onError("Not found on Modrinth: " + response.code()); return; }
-                    onSuccess.onSuccess(gson.fromJson(response.body().string(), ModVersion.class));
-                }
+                version = gson.fromJson(fetchWithRetry(BASE + "/version_file/" + sha1 + "?algorithm=sha1"), ModVersion.class);
+            } catch (HttpStatusException e) {
+                onError.onError(e.code == 404 ? "Not found on Modrinth: 404" : "Modrinth error: " + e.code); return;
             } catch (IOException e) {
-                onError.onError("Network error: " + e.getMessage());
+                onError.onError("Network error: " + e.getMessage()); return;
+            } catch (RuntimeException e) {
+                onError.onError("Bad response: " + e.getMessage()); return;
             }
+            onSuccess.onSuccess(version);
         }).start();
     }
 
