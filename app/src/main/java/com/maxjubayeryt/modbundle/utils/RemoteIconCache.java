@@ -76,7 +76,7 @@ public class RemoteIconCache {
         pool.execute(() -> {
             // Key on the URL as well as the tag: the tag is the installed file's path, so a file
             // replaced/updated under the same name would otherwise keep showing the old icon.
-            File cacheFile = new File(cacheDir, sanitize(tag) + "_" + Integer.toHexString(url.hashCode()) + ".ico");
+            File cacheFile = new File(cacheDir, cacheKey(tag, url) + ".ico");
             if (cacheFile.isFile() && cacheFile.canRead()) {
                 Bitmap bmp = BitmapFactory.decodeFile(cacheFile.getAbsolutePath());
                 if (bmp != null) {
@@ -154,7 +154,21 @@ public class RemoteIconCache {
         });
     }
 
-    private static String sanitize(String tag) {
-        return tag.replaceAll("[^a-zA-Z0-9._-]", "_");
+    /**
+     * Fixed-length cache file name derived from tag+url. The tag is the installed file's path or
+     * SAF content URI, which routinely exceeds the 255-byte filename limit; using it verbatim made
+     * FileOutputStream throw, so the icon download failed every time. Mods and resource packs never
+     * hit this because they use an embedded icon, so only shader packs (remote icon only) broke.
+     */
+    private static String cacheKey(String tag, String url) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-1");
+            byte[] d = md.digest((tag + "\n" + url).getBytes("UTF-8"));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : d) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (Exception e) {
+            return Integer.toHexString(tag.hashCode()) + "_" + Integer.toHexString(url.hashCode());
+        }
     }
 }
