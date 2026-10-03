@@ -64,6 +64,12 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew assembleRelease -PabiSplits --stacktrace
+      - name: Build Release AAB
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew bundleRelease --stacktrace
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
@@ -75,4 +81,10 @@ jobs:
         with:
           name: ModBundle-Release
           path: app/build/outputs/apk/release/*.apk
+          retention-days: 30
+      - name: Upload Release AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: ModBundle-Release-AAB
+          path: app/build/outputs/bundle/release/*.aab
           retention-days: 30
