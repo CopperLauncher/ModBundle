@@ -30,6 +30,11 @@ public class ContentNameResolver {
     private static final ExecutorService sExecutor = Executors.newFixedThreadPool(2);
     private static final ModrinthApi sModrinth = new ModrinthApi();
 
+    /** Already-resolved display name for this filename, or null. Lets rows show it instantly on rebind. */
+    public static String getCached(String fileName) {
+        return fileName != null ? sCache.get(fileName) : null;
+    }
+
     public static void resolve(Context ctx, Object file, String fileName, String instanceKey,
                                InstalledIndex index, NameCallback callback) {
         String cached = sCache.get(fileName);

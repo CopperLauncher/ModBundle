@@ -97,6 +97,12 @@ public class MainActivity extends AppCompatActivity {
     private static final java.util.concurrent.ExecutorService sBgExecutor =
             java.util.concurrent.Executors.newFixedThreadPool(3);
 
+    // Directory listing gets its own executor. It used to share sBgExecutor with the hash/
+    // network work (backfill, update checks), so a refresh after toggling a mod could sit
+    // in the queue behind dozens of file hashes before it even started listing.
+    private static final java.util.concurrent.ExecutorService sListExecutor =
+            java.util.concurrent.Executors.newSingleThreadExecutor();
+
     private int currentOffset = 0;
     private String currentQuery = "";
     private boolean isLoading = false;
@@ -268,108 +274,8 @@ public class MainActivity extends AppCompatActivity {
         });
 
         // Wire rename/edit listener - name + loader + version
-        instanceAdapter.setRenameListener((instance, currentName) -> {
-            String path = instance.path;
-            android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
-            layout.setOrientation(android.widget.LinearLayout.VERTICAL);
-            layout.setPadding(48, 16, 48, 8);
-
-            // Name
-            android.widget.EditText etName = new android.widget.EditText(this);
-            etName.setHint("Instance name");
-            etName.setText(currentName);
-            etName.setTextColor(com.maxjubayeryt.modbundle.utils.ThemeColors.onSurface(etName));
-            etName.setHintTextColor(com.maxjubayeryt.modbundle.utils.ThemeColors.onSurfaceVariant(etName));
-            layout.addView(etName);
-
-            // Loader label + spinner
-            android.widget.TextView tvLoader = new android.widget.TextView(this);
-            tvLoader.setText("Loader");
-            tvLoader.setTextColor(com.maxjubayeryt.modbundle.utils.ThemeColors.onSurfaceVariant(tvLoader));
-            tvLoader.setTextSize(12f);
-            tvLoader.setPadding(0, 20, 0, 4);
-            layout.addView(tvLoader);
-            android.widget.Spinner spLoader = new android.widget.Spinner(this);
-            android.widget.ArrayAdapter<String> lAd = new android.widget.ArrayAdapter<>(
-                this, android.R.layout.simple_spinner_item, LOADERS);
-            lAd.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-            spLoader.setAdapter(lAd);
-            String savedL = instanceNameStore.getLoader(path);
-            for (int i = 0; i < LOADERS.length; i++) {
-                if (LOADERS[i].equalsIgnoreCase(savedL)) { spLoader.setSelection(i); break; }
-            }
-            layout.addView(spLoader);
-
-            // MC Version label + spinner
-            android.widget.TextView tvVer = new android.widget.TextView(this);
-            tvVer.setText("Minecraft Version");
-            tvVer.setTextColor(com.maxjubayeryt.modbundle.utils.ThemeColors.onSurfaceVariant(tvVer));
-            tvVer.setTextSize(12f);
-            tvVer.setPadding(0, 20, 0, 4);
-            layout.addView(tvVer);
-
-            // Include snapshots checkbox
-            android.widget.CheckBox cbSnap = new android.widget.CheckBox(this);
-            cbSnap.setText("Include Snapshots");
-            cbSnap.setTextColor(com.maxjubayeryt.modbundle.utils.ThemeColors.onSurfaceVariant(cbSnap));
-            CompoundButtonCompat.setButtonTintList(cbSnap, android.content.res.ColorStateList.valueOf(com.maxjubayeryt.modbundle.utils.ThemeColors.primary(cbSnap)));
-            cbSnap.setChecked(false);
-            layout.addView(cbSnap);
-
-            android.widget.Spinner spVersion = new android.widget.Spinner(this);
-            layout.addView(spVersion);
-
-            // Load versions using current snapshots pref
-            final boolean[] snapState = {false};
-            java.util.List<String> verList = new java.util.ArrayList<>();
-            verList.add("Any");
-            android.widget.ArrayAdapter<String> verAd = new android.widget.ArrayAdapter<>(
-                this, android.R.layout.simple_spinner_item, verList);
-            verAd.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-            spVersion.setAdapter(verAd);
-
-            // Helper to reload versions
-            final Runnable[] loadVersions = {null};
-            loadVersions[0] = () -> {
-                api.getGameVersions(snapState[0], versions -> {
-                    handler.post(() -> {
-                        verList.clear();
-                        verList.add("Any");
-                        verList.addAll(versions.subList(Math.min(1, versions.size()), versions.size()));
-                        verAd.notifyDataSetChanged();
-                        String savedV = instanceNameStore.getVersion(path);
-                        for (int i = 0; i < verList.size(); i++) {
-                            if (savedV.equals(verList.get(i))) { spVersion.setSelection(i); break; }
-                        }
-                    });
-                }, err -> {});
-            };
-            loadVersions[0].run();
-
-            cbSnap.setOnCheckedChangeListener((btn, isChecked) -> {
-                snapState[0] = isChecked;
-                loadVersions[0].run();
-            });
-
-            new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
-                .setTitle("Edit Instance")
-                .setView(layout)
-                .setPositiveButton("Save", (d, w) -> {
-                    String newName = etName.getText().toString().trim();
-                    String newLoader = spLoader.getSelectedItem().toString();
-                    Object selV = spVersion.getSelectedItem();
-                    String newVersion = selV != null ? selV.toString() : "";
-                    if ("Any".equals(newLoader)) newLoader = "";
-                    if ("Any".equals(newVersion)) newVersion = "";
-                    if (!newName.isEmpty()) instanceNameStore.setName(path, newName);
-                    instanceNameStore.setLoader(path, newLoader);
-                    instanceNameStore.setVersion(path, newVersion);
-                    instanceAdapter.notifyDataSetChanged();
-                    updateActiveInstanceLabel();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-        });
+        instanceAdapter.setRenameListener((instance, currentName) ->
+            showInstanceDetailsDialog(instance.path, currentName, false, null, null));
 
         // Wire logo picker listener
         instanceAdapter.setLogoListener((instance, path) -> {
@@ -441,6 +347,213 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         updateActiveInstanceLabel();
+    }
+
+    /**
+     * Name / loader / Minecraft version editor for an instance. In forced mode (used right after
+     * a folder is picked to add a new instance) there is no "Any" choice, the dialog can't be
+     * dismissed by tapping outside or pressing back, and Save is rejected until a loader and a
+     * Minecraft version are selected. Cancel discards the instance entirely via onCancelled.
+     */
+    private void showInstanceDetailsDialog(String path, String currentName, boolean forced,
+                                           Runnable onSaved, Runnable onCancelled) {
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        layout.setPadding(48, 16, 48, 8);
+
+        android.widget.EditText etName = new android.widget.EditText(this);
+        etName.setHint("Instance name");
+        etName.setText(currentName);
+        etName.setTextColor(com.maxjubayeryt.modbundle.utils.ThemeColors.onSurface(etName));
+        etName.setHintTextColor(com.maxjubayeryt.modbundle.utils.ThemeColors.onSurfaceVariant(etName));
+        layout.addView(etName);
+
+        android.widget.TextView tvLoader = new android.widget.TextView(this);
+        tvLoader.setText(forced ? "Loader (required)" : "Loader");
+        tvLoader.setTextColor(com.maxjubayeryt.modbundle.utils.ThemeColors.onSurfaceVariant(tvLoader));
+        tvLoader.setTextSize(12f);
+        tvLoader.setPadding(0, 20, 0, 4);
+        layout.addView(tvLoader);
+        final String[] loaderChoices = forced ? Arrays.copyOfRange(LOADERS, 1, LOADERS.length) : LOADERS;
+        android.widget.Spinner spLoader = new android.widget.Spinner(this);
+        android.widget.ArrayAdapter<String> lAd = new android.widget.ArrayAdapter<>(
+            this, android.R.layout.simple_spinner_item, loaderChoices);
+        lAd.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spLoader.setAdapter(lAd);
+        String savedL = instanceNameStore.getLoader(path);
+        for (int i = 0; i < loaderChoices.length; i++) {
+            if (loaderChoices[i].equalsIgnoreCase(savedL)) { spLoader.setSelection(i); break; }
+        }
+        layout.addView(spLoader);
+
+        android.widget.TextView tvVer = new android.widget.TextView(this);
+        tvVer.setText(forced ? "Minecraft Version (required)" : "Minecraft Version");
+        tvVer.setTextColor(com.maxjubayeryt.modbundle.utils.ThemeColors.onSurfaceVariant(tvVer));
+        tvVer.setTextSize(12f);
+        tvVer.setPadding(0, 20, 0, 4);
+        layout.addView(tvVer);
+
+        android.widget.CheckBox cbSnap = new android.widget.CheckBox(this);
+        cbSnap.setText("Include Snapshots");
+        cbSnap.setTextColor(com.maxjubayeryt.modbundle.utils.ThemeColors.onSurfaceVariant(cbSnap));
+        CompoundButtonCompat.setButtonTintList(cbSnap, android.content.res.ColorStateList.valueOf(com.maxjubayeryt.modbundle.utils.ThemeColors.primary(cbSnap)));
+        cbSnap.setChecked(false);
+        layout.addView(cbSnap);
+
+        android.widget.Spinner spVersion = new android.widget.Spinner(this);
+        layout.addView(spVersion);
+
+        final boolean[] snapState = {false};
+        final boolean[] firstLoad = {true};
+        final boolean[] versionsLoaded = {false};
+        java.util.List<String> verList = new java.util.ArrayList<>();
+        if (!forced) verList.add("Any");
+        android.widget.ArrayAdapter<String> verAd = new android.widget.ArrayAdapter<>(
+            this, android.R.layout.simple_spinner_item, verList);
+        verAd.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spVersion.setAdapter(verAd);
+
+        final Runnable[] loadVersions = {null};
+        loadVersions[0] = () -> {
+            api.getGameVersions(snapState[0], versions -> {
+                handler.post(() -> {
+                    Object sel = spVersion.getSelectedItem();
+                    String target = firstLoad[0] ? instanceNameStore.getVersion(path) : (sel != null ? sel.toString() : "");
+                    firstLoad[0] = false;
+                    verList.clear();
+                    if (!forced) verList.add("Any");
+                    verList.addAll(versions.subList(Math.min(1, versions.size()), versions.size()));
+                    verAd.notifyDataSetChanged();
+                    versionsLoaded[0] = !verList.isEmpty();
+                    for (int i = 0; i < verList.size(); i++) {
+                        if (verList.get(i).equals(target)) { spVersion.setSelection(i); break; }
+                    }
+                });
+            }, err -> {
+                if (forced) handler.post(() -> Toast.makeText(this,
+                        "Couldn't load Minecraft versions. Check your connection and toggle Include Snapshots to retry.",
+                        Toast.LENGTH_LONG).show());
+            });
+        };
+        loadVersions[0].run();
+
+        cbSnap.setOnCheckedChangeListener((btn, isChecked) -> {
+            snapState[0] = isChecked;
+            loadVersions[0].run();
+        });
+
+        com.google.android.material.dialog.MaterialAlertDialogBuilder builder =
+            new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(forced ? "New Instance" : "Edit Instance")
+                .setView(layout)
+                .setPositiveButton("Save", null)
+                .setNegativeButton("Cancel", null);
+        if (forced) builder.setCancelable(false);
+        final androidx.appcompat.app.AlertDialog dialog = builder.create();
+        dialog.setOnShowListener(di -> {
+            dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                Object selL = spLoader.getSelectedItem();
+                Object selV = spVersion.getSelectedItem();
+                String newLoader = selL != null ? selL.toString() : "";
+                String newVersion = selV != null ? selV.toString() : "";
+                if (forced && (newLoader.isEmpty() || newVersion.isEmpty() || !versionsLoaded[0])) {
+                    Toast.makeText(this, "Select a loader and a Minecraft version to add this instance", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                String newName = etName.getText().toString().trim();
+                if ("Any".equals(newLoader)) newLoader = "";
+                if ("Any".equals(newVersion)) newVersion = "";
+                if (!newName.isEmpty()) instanceNameStore.setName(path, newName);
+                instanceNameStore.setLoader(path, newLoader);
+                instanceNameStore.setVersion(path, newVersion);
+                instanceAdapter.notifyDataSetChanged();
+                updateActiveInstanceLabel();
+                dialog.dismiss();
+                if (onSaved != null) onSaved.run();
+            });
+            dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE).setOnClickListener(v -> {
+                dialog.dismiss();
+                if (onCancelled != null) onCancelled.run();
+            });
+        });
+        dialog.show();
+    }
+
+    /**
+     * Entry point for a freshly picked instance folder. The instance is NOT added (nor made
+     * active) until the user has chosen a loader and Minecraft version in the forced dialog;
+     * cancelling it leaves the app exactly as it was. Folders that are already known, or that
+     * already have both values stored, skip the dialog.
+     */
+    private void requestInstanceSetup(Uri saveUri, String path, boolean contentUri, Uri treeUri) {
+        boolean known = false;
+        for (InstanceAdapter.InstanceEntry e : instanceList) if (e.path.equals(path)) { known = true; break; }
+        String l = instanceNameStore.getLoader(path), v = instanceNameStore.getVersion(path);
+        boolean configured = l != null && !l.isEmpty() && v != null && !v.isEmpty();
+        if (known || configured) {
+            commitNewInstance(saveUri, path, contentUri, treeUri);
+            return;
+        }
+        showInstanceDetailsDialog(path, "", true,
+            () -> commitNewInstance(saveUri, path, contentUri, treeUri), null);
+    }
+
+    private void commitNewInstance(Uri saveUri, String path, boolean contentUri, Uri treeUri) {
+        prefs.saveInstanceUri(saveUri);
+        addInstanceIfNotPresent(new InstanceAdapter.InstanceEntry(path, contentUri));
+        instanceAdapter.setActiveInstancePath(path);
+        updateFolderLabel();
+        updateActiveInstanceLabel();
+        refreshInstallIndexBinding();
+        applyInstanceFilters(path); // runs the search itself when loader/version are set
+        if (!(instanceNameStore.getLoader(path).length() > 0 || instanceNameStore.getVersion(path).length() > 0)) searchMods(true);
+        // Use the instance's own icon.webp as its logo, if it has one and no logo was chosen yet.
+        if (instanceNameStore.getLogo(path) == null) {
+            sBgExecutor.execute(() -> {
+                String logo = importInstanceIcon(path, treeUri);
+                if (logo != null) handler.post(() -> {
+                    if (instanceNameStore.getLogo(path) == null) {
+                        instanceNameStore.setLogo(path, logo);
+                        instanceAdapter.notifyDataSetChanged();
+                    }
+                });
+            });
+        }
+    }
+
+    /**
+     * Looks for icon.webp in the instance folder (plain path first, then via the SAF tree) and
+     * copies it into app-private storage so the logo keeps working regardless of storage
+     * permissions. Returns a file:// URI string for InstanceNameStore, or null if none exists.
+     */
+    private String importInstanceIcon(String path, Uri treeUri) {
+        java.io.File dest = null;
+        try {
+            java.io.File dir = new java.io.File(getFilesDir(), "instance_icons");
+            if (!dir.exists()) dir.mkdirs();
+            dest = new java.io.File(dir, Integer.toHexString(path.hashCode()) + "_" + Long.toHexString(System.nanoTime()) + ".webp");
+            java.io.InputStream in = null;
+            if (!path.startsWith("content://")) {
+                java.io.File icon = new java.io.File(path, "icon.webp");
+                if (icon.isFile() && icon.canRead()) in = new java.io.FileInputStream(icon);
+            }
+            if (in == null && treeUri != null && "content".equals(treeUri.getScheme())) {
+                androidx.documentfile.provider.DocumentFile root = androidx.documentfile.provider.DocumentFile.fromTreeUri(this, treeUri);
+                androidx.documentfile.provider.DocumentFile icon = root != null ? root.findFile("icon.webp") : null;
+                if (icon != null && icon.isFile()) in = getContentResolver().openInputStream(icon.getUri());
+            }
+            if (in == null) return null;
+            try (java.io.InputStream src = in; java.io.OutputStream out = new java.io.FileOutputStream(dest)) {
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = src.read(buf)) != -1) out.write(buf, 0, n);
+            }
+            if (android.graphics.BitmapFactory.decodeFile(dest.getAbsolutePath()) == null) { dest.delete(); return null; }
+            return Uri.fromFile(dest).toString();
+        } catch (Exception e) {
+            if (dest != null) dest.delete();
+            return null;
+        }
     }
 
     private void addInstanceIfNotPresent(InstanceAdapter.InstanceEntry instanceEntry) {
@@ -1506,18 +1619,24 @@ public class MainActivity extends AppCompatActivity {
             installedRecycler.setVisibility(View.GONE);
             emptyInstalled.setVisibility(View.GONE);
         }
-        sBgExecutor.execute(() -> {
+        sListExecutor.execute(() -> {
             List<Object> collected = new ArrayList<>();
             try {
                 Uri instanceUri = prefs.getInstanceUri();
                 if (instanceUri != null && "content".equals(instanceUri.getScheme())) {
-                    androidx.documentfile.provider.DocumentFile instanceDir = androidx.documentfile.provider.DocumentFile.fromTreeUri(this, instanceUri);
-                    if (instanceDir != null) {
-                        androidx.documentfile.provider.DocumentFile subDir = instanceDir.findFile(requestedType);
-                        if (subDir != null) {
-                            for (androidx.documentfile.provider.DocumentFile f : subDir.listFiles()) {
-                                String name = f.getName();
-                                if (name != null && (name.endsWith(".jar") || name.endsWith(".zip") || name.endsWith(".disabled"))) collected.add(f);
+                    if (!listContentFast(instanceUri, requestedType, collected)) {
+                        // Slow path, only if the bulk query isn't usable for this provider.
+                        androidx.documentfile.provider.DocumentFile instanceDir = androidx.documentfile.provider.DocumentFile.fromTreeUri(this, instanceUri);
+                        if (instanceDir != null) {
+                            androidx.documentfile.provider.DocumentFile subDir = instanceDir.findFile(requestedType);
+                            if (subDir != null) {
+                                for (androidx.documentfile.provider.DocumentFile f : subDir.listFiles()) {
+                                    String name = f.getName();
+                                    if (name != null && (name.endsWith(".jar") || name.endsWith(".zip") || name.endsWith(".disabled"))) {
+                                        com.maxjubayeryt.modbundle.utils.FileInfoCache.put(f.getUri().toString(), name, f.length());
+                                        collected.add(f);
+                                    }
+                                }
                             }
                         }
                     }
@@ -1538,16 +1657,14 @@ public class MainActivity extends AppCompatActivity {
                 }
             } catch (Exception e) { /* fall through with whatever was collected */ }
 
-            // listFiles()/DocumentFile enumeration order isn't stable — it reflects filesystem/SAF
-            // directory order, which can (and does) change after a rename. Disabling/enabling a
-            // mod renames it (adds/removes ".disabled"), so without an explicit sort here the row
-            // jumps to wherever the provider now happens to list it. Sorting by filename keeps the
-            // list in the same order across refreshes regardless of enumeration order.
+            // Enumeration order isn't stable (it changes after a rename), so sort by filename.
+            // Names come from the bulk-query cache, so this no longer does a provider round trip
+            // per comparison.
             collected.sort((a, b) -> {
                 String nameA = (a instanceof androidx.documentfile.provider.DocumentFile)
-                        ? ((androidx.documentfile.provider.DocumentFile) a).getName() : ((java.io.File) a).getName();
+                        ? com.maxjubayeryt.modbundle.utils.FileInfoCache.name((androidx.documentfile.provider.DocumentFile) a) : ((java.io.File) a).getName();
                 String nameB = (b instanceof androidx.documentfile.provider.DocumentFile)
-                        ? ((androidx.documentfile.provider.DocumentFile) b).getName() : ((java.io.File) b).getName();
+                        ? com.maxjubayeryt.modbundle.utils.FileInfoCache.name((androidx.documentfile.provider.DocumentFile) b) : ((java.io.File) b).getName();
                 if (nameA == null) nameA = "";
                 if (nameB == null) nameB = "";
                 return nameA.compareToIgnoreCase(nameB);
@@ -1555,6 +1672,9 @@ public class MainActivity extends AppCompatActivity {
 
             handler.post(() -> {
                 if (!requestedType.equals(currentInstalledType)) return; // user switched tabs while this was loading
+                // Show the content right now, without any icon/name resolution competing with
+                // the first layout pass; those are switched on once the rows are on screen.
+                installedAdapter.setEnrichmentEnabled(false);
                 installedLoading.setVisibility(View.GONE);
                 installedRecycler.setVisibility(View.VISIBLE);
                 installedMods.clear();
@@ -1562,9 +1682,67 @@ public class MainActivity extends AppCompatActivity {
                 installedAdapter.notifyDataSetChanged();
                 if (tvInstalledCount != null) tvInstalledCount.setText(installedMods.size() + " files");
                 emptyInstalled.setVisibility(installedMods.isEmpty() ? View.VISIBLE : View.GONE);
-                backfillInstalledIndex(requestedType, collected);
+                // View.post runs after the pending layout/draw pass, i.e. once the list is visible.
+                installedRecycler.post(() -> {
+                    if (!requestedType.equals(currentInstalledType)) return;
+                    installedAdapter.setEnrichmentEnabled(true);
+                });
+                // Identifying files for the Browse "Installed" badges hashes every file; it is
+                // purely background bookkeeping, so let icons/names go first.
+                handler.postDelayed(() -> {
+                    if (requestedType.equals(currentInstalledType)) backfillInstalledIndex(requestedType, collected);
+                }, 3000);
             });
         });
+    }
+
+    /**
+     * Lists a SAF instance's content folder with two ContentResolver queries total (one to find
+     * the sub-folder, one for its children) that return id, name and size together, instead of
+     * DocumentFile's findFile()/listFiles() which cost an extra provider round trip for every
+     * entry's name and again for every size. Returns false if the bulk query isn't usable.
+     */
+    private boolean listContentFast(Uri treeUri, String subFolder, List<Object> out) {
+        try {
+            String rootDocId = android.provider.DocumentsContract.getTreeDocumentId(treeUri);
+            String subDocId = null;
+            String[] projection = {
+                android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                android.provider.DocumentsContract.Document.COLUMN_SIZE,
+                android.provider.DocumentsContract.Document.COLUMN_MIME_TYPE
+            };
+            Uri rootChildren = android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, rootDocId);
+            try (android.database.Cursor c = getContentResolver().query(rootChildren, projection, null, null, null)) {
+                if (c == null) return false;
+                while (c.moveToNext()) {
+                    if (subFolder.equals(c.getString(1))
+                            && android.provider.DocumentsContract.Document.MIME_TYPE_DIR.equals(c.getString(3))) {
+                        subDocId = c.getString(0);
+                        break;
+                    }
+                }
+            }
+            if (subDocId == null) return true; // no such folder: genuinely empty
+            Uri children = android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, subDocId);
+            try (android.database.Cursor c = getContentResolver().query(children, projection, null, null, null)) {
+                if (c == null) return false;
+                while (c.moveToNext()) {
+                    String name = c.getString(1);
+                    if (name == null || !(name.endsWith(".jar") || name.endsWith(".zip") || name.endsWith(".disabled"))) continue;
+                    Uri docUri = android.provider.DocumentsContract.buildDocumentUriUsingTree(treeUri, c.getString(0));
+                    long size = c.isNull(2) ? 0L : c.getLong(2);
+                    androidx.documentfile.provider.DocumentFile df = androidx.documentfile.provider.DocumentFile.fromSingleUri(this, docUri);
+                    if (df == null) continue;
+                    com.maxjubayeryt.modbundle.utils.FileInfoCache.put(docUri.toString(), name, size);
+                    out.add(df);
+                }
+            }
+            return true;
+        } catch (Exception e) {
+            out.clear();
+            return false;
+        }
     }
 
     /**
@@ -1667,40 +1845,34 @@ public class MainActivity extends AppCompatActivity {
             if (uri == null) return;
             getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
 
+            Uri saveUri = null;
+            String instPath = null;
+            boolean instContent = false;
             Uri preferred = resolvePreferredInstanceUri(uri);
             if (preferred != null && "file".equals(preferred.getScheme())) {
                 java.io.File instanceDir = new java.io.File(preferred.getPath());
                 if (instanceDir.exists() && instanceDir.isDirectory()) {
-                    prefs.saveInstanceUri(preferred);
-                    addInstanceIfNotPresent(new InstanceAdapter.InstanceEntry(instanceDir.getAbsolutePath(), false));
-                    instanceAdapter.setActiveInstancePath(instanceDir.getAbsolutePath());
-                    updateFolderLabel();
-                    updateActiveInstanceLabel();
-                    searchMods(true);
-                    return;
+                    saveUri = preferred;
+                    instPath = instanceDir.getAbsolutePath();
                 }
             }
-
-            // Fallback to SAF if file path cannot be resolved
-            String realPath = getRealPathFromUri(uri);
-            if (realPath != null) {
-                java.io.File instanceDir = new java.io.File(realPath);
-                if (instanceDir.exists() && instanceDir.isDirectory()) {
-                    prefs.saveInstanceUri(uri);
-                    addInstanceIfNotPresent(new InstanceAdapter.InstanceEntry(instanceDir.getAbsolutePath(), false));
-                    instanceAdapter.setActiveInstancePath(instanceDir.getAbsolutePath());
-                    updateFolderLabel();
-                    updateActiveInstanceLabel();
-                    searchMods(true);
-                    return;
+            if (instPath == null) {
+                // Fallback to SAF if file path cannot be resolved
+                String realPath = getRealPathFromUri(uri);
+                if (realPath != null) {
+                    java.io.File instanceDir = new java.io.File(realPath);
+                    if (instanceDir.exists() && instanceDir.isDirectory()) {
+                        saveUri = uri;
+                        instPath = instanceDir.getAbsolutePath();
+                    }
                 }
             }
-            prefs.saveInstanceUri(uri);
-            addInstanceIfNotPresent(new InstanceAdapter.InstanceEntry(uri.toString(), true));
-            instanceAdapter.setActiveInstancePath(uri.toString());
-            updateFolderLabel();
-            updateActiveInstanceLabel();
-            searchMods(true);
+            if (instPath == null) {
+                saveUri = uri;
+                instPath = uri.toString();
+                instContent = true;
+            }
+            requestInstanceSetup(saveUri, instPath, instContent, uri);
             return;
         }
 

@@ -101,8 +101,9 @@ public class InstalledModsAdapter extends RecyclerView.Adapter<InstalledModsAdap
 
         if (mod instanceof DocumentFile) {
             DocumentFile df = (DocumentFile) mod;
-            name = df.getName() != null ? df.getName() : "";
-            size = df.length();
+            String cachedName = com.maxjubayeryt.modbundle.utils.FileInfoCache.name(df);
+            name = cachedName != null ? cachedName : "";
+            size = com.maxjubayeryt.modbundle.utils.FileInfoCache.size(df);
         } else if (mod instanceof File) {
             File f = (File) mod;
             name = f.getName();
@@ -120,32 +121,16 @@ public class InstalledModsAdapter extends RecyclerView.Adapter<InstalledModsAdap
             else selectedMods.remove(modRef);
         });
 
-        // Icon
+        // Content first: the row is bound with its filename, size and toggles right away. The
+        // (slow, network/zip-backed) icon and display-name resolution is deferred until the
+        // list has been laid out — see setEnrichmentEnabled() and the payload bind below.
         holder.icon.setImageResource(R.drawable.ic_mod_default);
         holder.icon.setTag(name);
-        ModIconLoader.FileType fileType = getFileType();
-        final String tagName = name;
-        final android.widget.ImageView iconView = holder.icon;
-        if (mod instanceof DocumentFile) {
-            ModIconLoader.load(iconView.getContext(), (DocumentFile) mod, fileType, new android.widget.ImageView(iconView.getContext()) {
-                public void setImageBitmap(android.graphics.Bitmap bm) { if (tagName.equals(iconView.getTag())) iconView.setImageBitmap(bm); }
-                public void setImageResource(int res) { if (tagName.equals(iconView.getTag())) iconView.setImageResource(res); }
-            });
-        } else if (mod instanceof File) {
-            ModIconLoader.load(iconView.getContext(), (File) mod, fileType, new android.widget.ImageView(iconView.getContext()) {
-                public void setImageBitmap(android.graphics.Bitmap bm) { if (tagName.equals(iconView.getTag())) iconView.setImageBitmap(bm); }
-                public void setImageResource(int res) { if (tagName.equals(iconView.getTag())) iconView.setImageResource(res); }
-            });
-        }
-
-        holder.name.setText(name); // immediate placeholder — replaced below once resolved
         holder.name.setTag(name);
-        final String nameTagAtBind = name;
-        final android.widget.TextView nameView = holder.name;
-        com.maxjubayeryt.modbundle.utils.ContentNameResolver.resolve(
-                nameView.getContext(), mod, name, instanceKey, installedIndex,
-                resolvedName -> { if (nameTagAtBind.equals(nameView.getTag())) nameView.setText(resolvedName); });
+        String cachedDisplay = com.maxjubayeryt.modbundle.utils.ContentNameResolver.getCached(name);
+        holder.name.setText(cachedDisplay != null ? cachedDisplay : name);
         holder.size.setText(formatSize(size));
+        if (enrichmentEnabled) startEnrichment(holder, mod, name);
 
         boolean isDisabled = name.endsWith(".disabled");
         String ext = isDisabled ? ".disabled" : name.endsWith(".jar") ? ".jar" : ".zip";
@@ -184,6 +169,57 @@ public class InstalledModsAdapter extends RecyclerView.Adapter<InstalledModsAdap
         holder.btnSwitchVersion.setOnClickListener(v -> {
             if (switchVersionListener != null) switchVersionListener.onSwitchVersion(modRef);
         });
+    }
+
+    private static final Object PAYLOAD_ENRICH = new Object();
+    private boolean enrichmentEnabled = true;
+
+    /**
+     * While false, rows bind without kicking off icon/display-name resolution, so a freshly
+     * loaded list appears immediately. Turning it back on rebinds only that part of the
+     * visible rows (no flicker, no toggle/listener churn).
+     */
+    public void setEnrichmentEnabled(boolean enabled) {
+        boolean was = enrichmentEnabled;
+        enrichmentEnabled = enabled;
+        if (enabled && !was && getItemCount() > 0) notifyItemRangeChanged(0, getItemCount(), PAYLOAD_ENRICH);
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull ViewHolder holder, int position, @NonNull java.util.List<Object> payloads) {
+        if (!payloads.isEmpty() && payloads.contains(PAYLOAD_ENRICH)) {
+            if (!enrichmentEnabled || position < 0 || position >= mods.size()) return;
+            Object mod = mods.get(position);
+            String name = (mod instanceof DocumentFile)
+                    ? com.maxjubayeryt.modbundle.utils.FileInfoCache.name((DocumentFile) mod)
+                    : (mod instanceof File) ? ((File) mod).getName() : null;
+            if (name != null) startEnrichment(holder, mod, name);
+            return;
+        }
+        super.onBindViewHolder(holder, position, payloads);
+    }
+
+    private void startEnrichment(ViewHolder holder, Object mod, String name) {
+        ModIconLoader.FileType fileType = getFileType();
+        final String tagName = name;
+        final android.widget.ImageView iconView = holder.icon;
+        iconView.setTag(name);
+        holder.name.setTag(name);
+        if (mod instanceof DocumentFile) {
+            ModIconLoader.load(iconView.getContext(), (DocumentFile) mod, fileType, new android.widget.ImageView(iconView.getContext()) {
+                public void setImageBitmap(android.graphics.Bitmap bm) { if (tagName.equals(iconView.getTag())) iconView.setImageBitmap(bm); }
+                public void setImageResource(int res) { if (tagName.equals(iconView.getTag())) iconView.setImageResource(res); }
+            });
+        } else if (mod instanceof File) {
+            ModIconLoader.load(iconView.getContext(), (File) mod, fileType, new android.widget.ImageView(iconView.getContext()) {
+                public void setImageBitmap(android.graphics.Bitmap bm) { if (tagName.equals(iconView.getTag())) iconView.setImageBitmap(bm); }
+                public void setImageResource(int res) { if (tagName.equals(iconView.getTag())) iconView.setImageResource(res); }
+            });
+        }
+        final android.widget.TextView nameView = holder.name;
+        com.maxjubayeryt.modbundle.utils.ContentNameResolver.resolve(
+                nameView.getContext(), mod, name, instanceKey, installedIndex,
+                resolvedName -> { if (tagName.equals(nameView.getTag())) nameView.setText(resolvedName); });
     }
 
     private ModIconLoader.FileType getFileType() {
