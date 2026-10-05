@@ -232,6 +232,63 @@ public class CurseForgeApi {
         }).start();
     }
 
+    /** Long description of a CurseForge project, as HTML. */
+    public void getDescription(String modId, ModrinthApi.OnSuccess<String> onSuccess, ModrinthApi.OnError onError) {
+        if (!ENABLED) { onError.onError("CurseForge support unavailable"); return; }
+        new Thread(() -> {
+            try {
+                Request request = new Request.Builder()
+                        .url(BASE + "/mods/" + modId + "/description")
+                        .header("x-api-key", API_KEY)
+                        .header("Accept", "application/json")
+                        .build();
+                try (Response response = client.newCall(request).execute()) {
+                    if (!response.isSuccessful() || response.body() == null) { onError.onError("CF Error: " + response.code()); return; }
+                    JsonObject json = gson.fromJson(response.body().string(), JsonObject.class);
+                    if (!json.has("data") || json.get("data").isJsonNull()) { onError.onError("No data"); return; }
+                    onSuccess.onSuccess(json.get("data").getAsString());
+                }
+            } catch (Exception e) { onError.onError(e.getMessage()); }
+        }).start();
+    }
+
+    /**
+     * Changelogs for the newest {@code max} files. CurseForge only exposes a changelog one file
+     * at a time, so this is capped instead of firing a request per file ever uploaded. Each
+     * result is {displayName, fileDate, changelogHtml}.
+     */
+    public void getChangelogs(String modId, List<JsonObject> files, int max,
+                              ModrinthApi.OnSuccess<List<String[]>> onSuccess, ModrinthApi.OnError onError) {
+        if (!ENABLED) { onError.onError("CurseForge support unavailable"); return; }
+        new Thread(() -> {
+            List<String[]> out = new ArrayList<>();
+            try {
+                for (int i = 0; i < files.size() && i < max; i++) {
+                    JsonObject f = files.get(i);
+                    if (!f.has("id")) continue;
+                    String title = f.has("displayName") && !f.get("displayName").isJsonNull()
+                            ? f.get("displayName").getAsString()
+                            : (f.has("fileName") ? f.get("fileName").getAsString() : "File");
+                    String date = f.has("fileDate") && !f.get("fileDate").isJsonNull() ? f.get("fileDate").getAsString() : "";
+                    String html = "";
+                    Request request = new Request.Builder()
+                            .url(BASE + "/mods/" + modId + "/files/" + f.get("id").getAsString() + "/changelog")
+                            .header("x-api-key", API_KEY)
+                            .header("Accept", "application/json")
+                            .build();
+                    try (Response response = client.newCall(request).execute()) {
+                        if (response.isSuccessful() && response.body() != null) {
+                            JsonObject json = gson.fromJson(response.body().string(), JsonObject.class);
+                            if (json.has("data") && !json.get("data").isJsonNull()) html = json.get("data").getAsString();
+                        }
+                    } catch (Exception ignored) { /* keep going: one missing changelog shouldn't hide the rest */ }
+                    out.add(new String[]{title, date, html});
+                }
+                onSuccess.onSuccess(out);
+            } catch (Exception e) { onError.onError(e.getMessage()); }
+        }).start();
+    }
+
     private int loaderType(String loader) {
         switch (loader.toLowerCase()) {
             case "forge": return 1;

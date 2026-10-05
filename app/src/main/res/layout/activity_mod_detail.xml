@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -21,6 +22,15 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:tint="?attr/colorOnSurface"
             android:contentDescription="Back"/>
+        <ImageButton
+            android:id="@+id/btn_share"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="4dp"
+            android:src="@drawable/ic_share"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:tint="?attr/colorOnSurface"
+            android:contentDescription="Share"/>
         <TextView
             android:id="@+id/tv_detail_title"
             android:layout_width="0dp"
@@ -161,27 +171,115 @@
                 android:background="#333"
                 android:layout_marginBottom="16dp"/>
 
-            <!-- Versions list -->
-            <TextView
+            <!-- Tabs: Versions is selected by default -->
+            <com.google.android.material.tabs.TabLayout
+                android:id="@+id/detail_tabs"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Versions"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="13sp"
-                android:layout_marginBottom="8dp"/>
+                android:layout_marginBottom="12dp"
+                android:background="@android:color/transparent"
+                app:tabMode="fixed"
+                app:tabGravity="fill"/>
 
-            <ProgressBar
-                android:id="@+id/detail_versions_progress"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center_horizontal"
-                android:visibility="gone"/>
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/detail_versions_recycler"
+            <!-- Versions -->
+            <LinearLayout
+                android:id="@+id/pane_versions"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:nestedScrollingEnabled="true"/>
+                android:orientation="vertical">
+                <ProgressBar
+                    android:id="@+id/detail_versions_progress"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:visibility="gone"/>
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/detail_versions_recycler"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="true"/>
+            </LinearLayout>
+
+            <!-- Description -->
+            <LinearLayout
+                android:id="@+id/pane_description"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+                <ProgressBar
+                    android:id="@+id/detail_desc_progress"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:visibility="gone"/>
+                <TextView
+                    android:id="@+id/detail_desc_empty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="13sp"
+                    android:visibility="gone"/>
+                <WebView
+                    android:id="@+id/detail_desc_web"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone"/>
+            </LinearLayout>
+
+            <!-- Gallery -->
+            <LinearLayout
+                android:id="@+id/pane_gallery"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+                <ProgressBar
+                    android:id="@+id/detail_gallery_progress"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:visibility="gone"/>
+                <TextView
+                    android:id="@+id/detail_gallery_empty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="13sp"
+                    android:visibility="gone"/>
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/detail_gallery_recycler"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false"/>
+            </LinearLayout>
+
+            <!-- Changelog -->
+            <LinearLayout
+                android:id="@+id/pane_changelog"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+                <ProgressBar
+                    android:id="@+id/detail_changelog_progress"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:visibility="gone"/>
+                <TextView
+                    android:id="@+id/detail_changelog_empty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="13sp"
+                    android:visibility="gone"/>
+                <WebView
+                    android:id="@+id/detail_changelog_web"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone"/>
+            </LinearLayout>
 
         </LinearLayout>
     </ScrollView>

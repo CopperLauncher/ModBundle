@@ -10,6 +10,7 @@ public class ModVersion {
     @SerializedName("version_number") public String versionNumber;
     @SerializedName("version_type") public String versionType;
     @SerializedName("date_published") public String datePublished;
+    @SerializedName("changelog")      public String changelog;
     @SerializedName("game_versions")  public List<String> gameVersions;
     @SerializedName("loaders")        public List<String> loaders;
     @SerializedName("files")          public List<VersionFile> files;

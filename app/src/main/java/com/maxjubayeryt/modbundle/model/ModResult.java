@@ -13,6 +13,8 @@ public class ModResult {
     @SerializedName("categories") public List<String> categories;
     @SerializedName("versions")   public List<String> versions;
     @SerializedName("followers") public int followers;
+    @SerializedName("body")       public String body;      // Modrinth long description (markdown)
+    @SerializedName("gallery")    public List<GalleryImage> gallery;
     public String source = "modrinth";
     @SerializedName("latest_version") public String latestVersion;
 
@@ -23,4 +25,10 @@ public class ModResult {
     // but installing it has to go through the CF website instead of a direct download.
     public boolean isRestricted = false;
     public String pageUrl;
+
+    public static class GalleryImage {
+        @SerializedName("url")         public String url;
+        @SerializedName("title")       public String title;
+        @SerializedName("description") public String description;
+    }
 }
