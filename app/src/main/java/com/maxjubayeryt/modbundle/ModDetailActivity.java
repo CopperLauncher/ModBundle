@@ -545,8 +545,7 @@ public class ModDetailActivity extends AppCompatActivity {
         } else {
             withModrinthProject(new ModrinthApi.Callback<ModResult>() {
                 public void onSuccess(ModResult project) {
-                    List<ModResult.GalleryImage> list = new java.util.ArrayList<>();
-                    if (project.gallery != null) for (ModResult.GalleryImage g : project.gallery) if (g != null && g.url != null) list.add(g);
+                    List<ModResult.GalleryImage> list = project.galleryImages();
                     handler.post(() -> showGallery(list, true));
                 }
                 public void onError(String error) { handler.post(() -> showGallery(null, false)); }
